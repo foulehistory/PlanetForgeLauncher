@@ -2,6 +2,7 @@
   "name": "launcher",
   "version": "1.0.1",
   "description": "PlanetForge Game Launcher",
+  "repository": "https://github.com/foulehistory/PlanetForgeLauncher",
   "author": "PlanetForge",
   "main": "dist-main/main.js",
   "scripts": {
