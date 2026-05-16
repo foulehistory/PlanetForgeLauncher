@@ -91,7 +91,7 @@ jobs:
             release/*.rpm
           if-no-files-found: warn
  
-  # ── Crée la GitHub Release avec tous les artifacts ──────────────────────────
+  # ── Crée la GitHub Release avec tous les artifacts ────────────────────────── 
   release:
     needs: [check, build]
     runs-on: ubuntu-latest
