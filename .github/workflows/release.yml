@@ -59,19 +59,15 @@ jobs:
         with:
           node-version: 20
 
-      # Linux — dépendances système
+      # Linux — dépendances système + conversion ico → png
       - name: Install Linux deps
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y rpm libarchive-tools
 
-      # Linux — conversion ico → png via Python
-      - name: Install Pillow for macOS
-        if: matrix.platform == 'mac'
-        run: pip3 install Pillow --break-system-packages
-
       - name: Convert ico to png for Linux
         if: matrix.platform == 'linux'
         run: |
+          pip install Pillow --break-system-packages
           python3 -c "
           from PIL import Image
           img = Image.open('renderer/public/icon.ico')
@@ -79,14 +75,13 @@ jobs:
           img.save('renderer/public/icon.png')
           "
 
-      # macOS — conversion ico → icns via Python + iconutil
-      - name: Install Pillow for macOS
-        if: matrix.platform == 'mac'
-        run: pip3 install Pillow
-
+      # macOS — conversion ico → icns via venv
       - name: Convert ico to icns for macOS
         if: matrix.platform == 'mac'
         run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install Pillow
           python3 -c "
           from PIL import Image
           import os
