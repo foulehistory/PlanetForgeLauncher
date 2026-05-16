@@ -1,6 +1,6 @@
 {
   "name": "launcher",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "PlanetForge Game Launcher",
   "author": "PlanetForge",
   "main": "dist-main/main.js",
@@ -23,7 +23,7 @@
     "@types/node": "^25.8.0",
     "concurrently": "^9.0.0",
     "cross-env": "^7.0.0",
-    "electron": "^35.0.0",
+    "electron": "^42.1.0",
     "electron-builder": "^26.8.1",
     "electronmon": "^2.0.0",
     "typescript": "^6.0.3"

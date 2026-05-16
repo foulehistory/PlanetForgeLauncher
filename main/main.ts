@@ -1,5 +1,12 @@
 import { app, BrowserWindow, ipcMain, Menu } from "electron";
 import path from "path";
+import { autoUpdater } from "electron-updater";
+
+// Auto-updater setup
+
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = false;
+
 
 const iconPath = () => {
   if (process.platform === "win32")   return path.join(__dirname, "../renderer/public/icon.ico");
@@ -69,4 +76,47 @@ ipcMain.handle("auth:register", async (_event, data) => {
   } catch {
     return { ok: false, error: "Server unreachable" };
   }
+});
+
+
+// ── isUpdateAvailable ────────────────────────────────────────────────────────
+ipcMain.handle("update:check", async () => {
+  try 
+  {
+    const result = await autoUpdater.checkForUpdates();
+    if (!result) return { available: false };
+
+    const current = app.getVersion();
+    const latest = result.updateInfo.version;
+    const available = latest !== current;
+
+    return {
+      available,
+      currentVersion: current,
+      latestVersion: latest,
+      releaseNotes: result.updateInfo.releaseNotes ?? null,
+    };
+  } catch {
+    return { available: false };
+  }
+});
+
+// ── installUpdate ────────────────────────────────────────────────────────────
+ipcMain.handle("update:download-and-install", async (_event) => {
+  return new Promise((resolve, reject) => {
+    autoUpdater.on("download-progress", (progress) => {
+      _event.sender.send("update:progress", Math.round(progress.percent));
+    });
+
+    autoUpdater.on("update-downloaded", () => {
+        autoUpdater.quitAndInstall();
+        resolve(true);
+    });
+
+    autoUpdater.on("error", (err) => {
+      reject(err.message);
+    });
+
+    autoUpdater.downloadUpdate();
+  });
 });

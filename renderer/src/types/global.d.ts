@@ -6,6 +6,13 @@ interface ApiResponse<T> {
   error?: string;
 }
 
+interface UpdateInfo {
+  available:      boolean;
+  currentVersion: string;
+  latestVersion:  string;
+  releaseNotes:   string | null;
+}
+
 declare global {
 interface Window {
   api: {
@@ -13,6 +20,9 @@ interface Window {
     register: (data: { username: string; email: string; password: string }) => Promise<ApiResponse<AuthResponse>>;
     getLibrary:  () => Promise<unknown>;
     installGame: (id: string) => Promise<unknown>;
+    isUpdateAvailable: () => Promise<UpdateInfo>;
+    installUpdate: () => void;
+    onUpdateProgress: (cb: (percent: number) => void) => void;
   };
 }
 }
