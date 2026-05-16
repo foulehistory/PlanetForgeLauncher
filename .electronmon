@@ -1,0 +1,7 @@
+{
+  "ignore": [
+    "renderer",
+    "renderer/dist",
+    "renderer/node_modules"
+  ]
+}

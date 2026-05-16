@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+renderer/node_modules/
+
+# Build outputs
+dist-main/
+renderer/dist/
+release/
+
+# Env
+.env
+.env.local
+
+# Logs
+*.log

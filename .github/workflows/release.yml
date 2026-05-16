@@ -1,0 +1,134 @@
+name: Release
+ 
+on:
+  push:
+    branches: [main]
+ 
+jobs:
+ 
+  # ── Vérifie si le commit contient -release ──────────────────────────────────
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      should-release: ${{ steps.check.outputs.should-release }}
+      version:        ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+ 
+      - name: Check commit message
+        id: check
+        run: |
+          MSG="${{ github.event.head_commit.message }}"
+          if echo "$MSG" | grep -q "\-release"; then
+            echo "should-release=true" >> $GITHUB_OUTPUT
+            echo "✅ Release detected: $MSG"
+          else
+            echo "should-release=false" >> $GITHUB_OUTPUT
+            echo "⏭️ No release tag, skipping"
+          fi
+ 
+      - name: Get version from package.json
+        id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+ 
+  # ── Build sur chaque plateforme ─────────────────────────────────────────────
+  build:
+    needs: check
+    if: needs.check.outputs.should-release == 'true'
+ 
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os:       windows-latest
+            platform: windows
+            script:   package:win
+          - os:       macos-latest
+            platform: mac
+            script:   package:mac
+          - os:       ubuntu-latest
+            platform: linux
+            script:   package:linux
+ 
+    runs-on: ${{ matrix.os }}
+ 
+    steps:
+      - uses: actions/checkout@v4
+ 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+ 
+      # Linux — dépendances système pour electron-builder
+      - name: Install Linux deps
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get install -y rpm libarchive-tools
+ 
+      - name: Install root dependencies
+        run: npm install
+ 
+      - name: Install renderer dependencies
+        run: npm --prefix renderer install
+ 
+      - name: Build (main + renderer)
+        run: npm run build
+ 
+      - name: Package — ${{ matrix.platform }}
+        run: npm run ${{ matrix.script }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+ 
+      # Upload les fichiers du dossier release/
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.AppImage
+            release/*.deb
+            release/*.rpm
+          if-no-files-found: warn
+ 
+  # ── Crée la GitHub Release avec tous les artifacts ──────────────────────────
+  release:
+    needs: [check, build]
+    runs-on: ubuntu-latest
+ 
+    steps:
+      - uses: actions/checkout@v4
+ 
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+ 
+      - name: Display structure
+        run: ls -R artifacts/
+ 
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name:   v${{ needs.check.outputs.version }}
+          name:       PlanetForge v${{ needs.check.outputs.version }}
+          draft:      false
+          prerelease: false
+          body: |
+            ## PlanetForge v${{ needs.check.outputs.version }}
+ 
+            ### Downloads
+            | Platform | File |
+            |----------|------|
+            | 🪟 Windows | `.exe` |
+            | 🍎 macOS   | `.dmg` |
+            | 🐧 Linux   | `.AppImage` |
+ 
+            ---
+            ${{ github.event.head_commit.message }}
+          files: |
+            artifacts/windows/*
+            artifacts/mac/*
+            artifacts/linux/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
