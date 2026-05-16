@@ -1,11 +1,11 @@
 name: Release
- 
+
 on:
   push:
     branches: [main]
- 
+
 jobs:
- 
+
   # ── Vérifie si le commit contient -release ──────────────────────────────────
   check:
     runs-on: ubuntu-latest
@@ -14,7 +14,7 @@ jobs:
       version:        ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
- 
+
       - name: Check commit message
         id: check
         run: |
@@ -26,16 +26,16 @@ jobs:
             echo "should-release=false" >> $GITHUB_OUTPUT
             echo "⏭️ No release tag, skipping"
           fi
- 
+
       - name: Get version from package.json
         id: version
         run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
- 
+
   # ── Build sur chaque plateforme ─────────────────────────────────────────────
   build:
     needs: check
     if: needs.check.outputs.should-release == 'true'
- 
+
     strategy:
       fail-fast: false
       matrix:
@@ -49,41 +49,62 @@ jobs:
           - os:       ubuntu-latest
             platform: linux
             script:   package:linux
- 
+
     runs-on: ${{ matrix.os }}
- 
+
     steps:
       - uses: actions/checkout@v4
- 
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
- 
-      # Linux — dépendances système pour electron-builder
+
+      # Linux — dépendances système
       - name: Install Linux deps
         if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get install -y rpm libarchive-tools
- 
+        run: sudo apt-get update && sudo apt-get install -y rpm libarchive-tools imagemagick
+
+      # macOS — imagemagick pour la conversion
+      - name: Install macOS deps
+        if: matrix.os == 'macos-latest'
+        run: brew install imagemagick
+
       - name: Install root dependencies
         run: npm install
- 
+
       - name: Install renderer dependencies
         run: npm --prefix renderer install
- 
+
+      # Linux — convertit .ico en .png 256x256
       - name: Convert ico to png for Linux
         if: matrix.platform == 'linux'
-        run: convert renderer/public/icon.ico[0] -resize 256x256 renderer/public/icon.png
+        run: magick renderer/public/icon.ico[0] -resize 256x256 renderer/public/icon.png
 
+      # macOS — convertit .ico en .icns
+      - name: Convert ico to icns for macOS
+        if: matrix.platform == 'mac'
+        run: |
+          mkdir icon.iconset
+          magick renderer/public/icon.ico[0] -resize 16x16     icon.iconset/icon_16x16.png
+          magick renderer/public/icon.ico[0] -resize 32x32     icon.iconset/icon_16x16@2x.png
+          magick renderer/public/icon.ico[0] -resize 32x32     icon.iconset/icon_32x32.png
+          magick renderer/public/icon.ico[0] -resize 64x64     icon.iconset/icon_32x32@2x.png
+          magick renderer/public/icon.ico[0] -resize 128x128   icon.iconset/icon_128x128.png
+          magick renderer/public/icon.ico[0] -resize 256x256   icon.iconset/icon_128x128@2x.png
+          magick renderer/public/icon.ico[0] -resize 256x256   icon.iconset/icon_256x256.png
+          magick renderer/public/icon.ico[0] -resize 512x512   icon.iconset/icon_256x256@2x.png
+          magick renderer/public/icon.ico[0] -resize 512x512   icon.iconset/icon_512x512.png
+          magick renderer/public/icon.ico[0] -resize 1024x1024 icon.iconset/icon_512x512@2x.png
+          iconutil -c icns icon.iconset -o renderer/public/icon.icns
 
       - name: Build (main + renderer)
         run: npm run build
- 
+
       - name: Package — ${{ matrix.platform }}
         run: npm run ${{ matrix.script }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
- 
-      # Upload les fichiers du dossier release/
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -95,23 +116,23 @@ jobs:
             release/*.deb
             release/*.rpm
           if-no-files-found: warn
- 
-  # ── Crée la GitHub Release avec tous les artifacts ────────────────────────── 
+
+  # ── Crée la GitHub Release avec tous les artifacts ──────────────────────────
   release:
     needs: [check, build]
     runs-on: ubuntu-latest
- 
+
     steps:
       - uses: actions/checkout@v4
- 
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts/
- 
+
       - name: Display structure
         run: ls -R artifacts/
- 
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -121,14 +142,14 @@ jobs:
           prerelease: false
           body: |
             ## PlanetForge v${{ needs.check.outputs.version }}
- 
+
             ### Downloads
             | Platform | File |
             |----------|------|
             | 🪟 Windows | `.exe` |
             | 🍎 macOS   | `.dmg` |
             | 🐧 Linux   | `.AppImage` |
- 
+
             ---
             ${{ github.event.head_commit.message }}
           files: |
