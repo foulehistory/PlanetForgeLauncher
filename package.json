@@ -1,9 +1,9 @@
 {
   "name": "launcher",
   "version": "1.0.0",
-  "main": "dist-main/main.js",    
   "description": "PlanetForge Game Launcher",
   "author": "PlanetForge",
+  "main": "dist-main/main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:electron\"",
     "dev:electron": "tsc -p tsconfig.json && electronmon .",
@@ -30,7 +30,6 @@
   },
   "build": {
     "appId": "com.planetforge.launcher",
-    "version": "1.0.0",
     "productName": "PlanetForge",
     "asar": true,
     "files": [
@@ -42,7 +41,11 @@
       "output": "release",
       "buildResources": "renderer/public"
     },
-    "icon": "renderer/public/icon.ico",
+    "publish": {
+      "provider": "github",
+      "owner": "Foulehistory",
+      "repo": "planetforge-launcher"
+    },
     "win": {
       "target": "nsis",
       "icon": "renderer/public/icon.ico"
@@ -56,10 +59,5 @@
       "icon": "renderer/public/icon.png",
       "category": "Game"
     }
-  },
-    "publish": {
-    "provider": "github",
-    "owner":    "Foulehistory",
-    "repo":     "planetforge-launcher"
   }
 }
