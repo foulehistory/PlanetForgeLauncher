@@ -28,8 +28,11 @@
   },
   "build": {
     "appId": "com.planetforge.launcher",
+    "version": "1.0.0",
+    "description": "PlanetForge Game Launcher",
+    "author": "PlanetForge",
     "productName": "PlanetForge",
-    "asar": false,
+    "asar": true,
     "files": [
       "dist-main/**/*",
       "renderer/dist/**/*",
@@ -50,7 +53,8 @@
     },
     "linux": {
       "target": "AppImage",
-      "icon": "renderer/public/icon.png"
+      "icon": "renderer/public/icon.png",
+      "category": "Game"
     }
   },
     "publish": {

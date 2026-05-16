@@ -22,8 +22,7 @@ function createWindow() {
   });
 
   if (app.isPackaged) {
-    win.loadFile(path.join(__dirname, "../renderer/dist/index.html"));
-    win.webContents.openDevTools(); // ← voir l'erreur dans la console
+    win.loadFile(path.join(process.resourcesPath, "app/renderer/dist/index.html"));
   } else {
     win.loadURL("http://localhost:5173");
   }
