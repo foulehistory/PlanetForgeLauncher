@@ -65,9 +65,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y rpm libarchive-tools
 
       # Linux — conversion ico → png via Python
-      - name: Install Pillow for Linux
-        if: matrix.platform == 'linux'
-        run: pip install Pillow
+      - name: Install Pillow for macOS
+        if: matrix.platform == 'mac'
+        run: pip3 install Pillow --break-system-packages
 
       - name: Convert ico to png for Linux
         if: matrix.platform == 'linux'
