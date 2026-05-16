@@ -31,7 +31,7 @@
   "build": {
     "appId": "com.planetforge.launcher",
     "productName": "PlanetForge",
-    "asar": true,
+    "asar": false,
     "files": [
       "dist-main/**/*",
       "renderer/dist/**/*",
