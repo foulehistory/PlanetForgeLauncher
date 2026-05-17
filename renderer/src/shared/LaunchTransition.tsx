@@ -1,7 +1,9 @@
 import { motion } from "framer-motion";
 import { Globe } from "lucide-react";
+import { useI18n } from "./i18n";
 
 export default function LaunchTransition({ onComplete }: { onComplete: () => void }) {
+  const { t } = useI18n();
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -57,7 +59,7 @@ export default function LaunchTransition({ onComplete }: { onComplete: () => voi
           <Globe size={28} style={{ color: "#3ecf8e" }} />
         </div>
         <span style={{ fontSize: 13, color: "#3ecf8e", fontWeight: 500 }}>
-          Launching…
+          {t.launching}
         </span>
       </motion.div>
     </motion.div>

@@ -4,6 +4,7 @@ import { Mail, Lock, User, LogIn, UserPlus, Globe } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import StatusAnimation, { type AnimationStatus } from "../shared/StatusAnimation";
 import LaunchTransition from "../shared/LaunchTransition";
+import { useI18n } from "../shared/i18n";
 
 type Tab = "login" | "register";
 
@@ -76,6 +77,7 @@ const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
 function LoginForm({ onSuccess }: {
   onSuccess: () => void;
 }) {
+  const { t } = useI18n();
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus]     = useState<AnimationStatus>("idle");
@@ -112,34 +114,34 @@ const handleSubmit = async () => {
       {status !== "idle" ? (
         <StatusAnimation
           status={status as Exclude<AnimationStatus, "idle">}
-          loadingText="Authenticating…"
-          loadingSubtext="Connecting to PlanetForge"
-          successText="Welcome back!"
-          successSubtext="Launching your launcher…"
-          errorText="Login failed"
-          errorSubtext="Invalid email or password"
+          loadingText={t.authLoginLoadingText}
+          loadingSubtext={t.authLoginLoadingSubtext}
+          successText={t.authLoginSuccessText}
+          successSubtext={t.authLoginSuccessSubtext}
+          errorText={t.authLoginErrorText}
+          errorSubtext={t.authLoginErrorSubtext}
         />
       ) : (
         <>
           <InputField
-            label="Email"
+            label={t.authEmailLabel}
             type="email"
-            placeholder="you@example.com"
+            placeholder={t.authEmailPlaceholder}
             icon={Mail}
             value={email}
             onChange={setEmail}
           />
           <InputField
-            label="Password"
+            label={t.authPasswordLabel}
             type="password"
-            placeholder="••••••••"
+            placeholder={t.authPasswordPlaceholder}
             icon={Lock}
             value={password}
             onChange={setPassword}
           />
 
           <div style={{ display: "flex", justifyContent: "flex-end", margin: "-8px 0 16px" }}>
-            <a style={{ fontSize: 12, color: "var(--accent)", cursor: "pointer" }}>Forgot password?</a>
+            <a style={{ fontSize: 12, color: "var(--accent)", cursor: "pointer" }}>{t.authForgotPassword}</a>
           </div>
 
           <button
@@ -148,17 +150,17 @@ const handleSubmit = async () => {
             onClick={handleSubmit}
             disabled={!email || !password}
           >
-            <LogIn size={14} /> Sign in
+            <LogIn size={14} /> {t.authSignIn}
           </button>
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0" }}>
             <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>or</span>
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{t.authOr}</span>
             <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
           </div>
 
           <button className="btn btn-ghost" style={{ width: "100%", justifyContent: "center" }}>
-            <Globe size={14} /> Continue with GitHub
+            <Globe size={14} /> {t.authContinueWithGithub}
           </button>
         </>
       )}
@@ -170,6 +172,7 @@ const handleSubmit = async () => {
 function RegisterForm({ onSuccess }: {
   onSuccess: () => void;
 }) {
+  const { t } = useI18n();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName]   = useState("");
   const [email, setEmail]         = useState("");
@@ -209,30 +212,30 @@ function RegisterForm({ onSuccess }: {
       {status !== "idle" ? (
         <StatusAnimation
           status={status as Exclude<AnimationStatus, "idle">}
-          loadingText="Creating your account…"
-          loadingSubtext="Setting up your profile"
-          successText="Account created!"
-          successSubtext="Welcome to PlanetForge"
-          errorText="Registration failed"
-          errorSubtext="Email already in use"
+          loadingText={t.authRegisterLoadingText}
+          loadingSubtext={t.authRegisterLoadingSubtext}
+          successText={t.authRegisterSuccessText}
+          successSubtext={t.authRegisterSuccessSubtext}
+          errorText={t.authRegisterErrorText}
+          errorSubtext={t.authRegisterErrorSubtext}
         />
       ) : (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <InputField label="First name" placeholder="Alex" icon={User} value={firstName} onChange={setFirstName} />
-            <InputField label="Last name"  placeholder="Dev"  icon={User} value={lastName}  onChange={setLastName} />
+            <InputField label={t.authFirstNameLabel} placeholder={t.authFirstNamePlaceholder} icon={User} value={firstName} onChange={setFirstName} />
+            <InputField label={t.authLastNameLabel}  placeholder={t.authLastNamePlaceholder}  icon={User} value={lastName}  onChange={setLastName} />
           </div>
 
-          <InputField label="Email" type="email" placeholder="you@example.com" icon={Mail} value={email} onChange={setEmail} />
+          <InputField label={t.authEmailLabel} type="email" placeholder={t.authEmailPlaceholder} icon={Mail} value={email} onChange={setEmail} />
 
           <div style={{ marginBottom: 16 }}>
-            <label className="input-label">Password</label>
+            <label className="input-label">{t.authPasswordLabel}</label>
             <div className="input-wrapper">
               <Lock size={15} className="input-icon" />
               <input
                 className="input"
                 type="password"
-                placeholder="••••••••"
+                placeholder={t.authPasswordPlaceholder}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -240,11 +243,11 @@ function RegisterForm({ onSuccess }: {
             {password && <PasswordStrength password={password} />}
           </div>
 
-          <InputField label="Confirm password" type="password" placeholder="••••••••" icon={Lock} value={confirm} onChange={setConfirm} />
+          <InputField label={t.authConfirmPasswordLabel} type="password" placeholder={t.authPasswordPlaceholder} icon={Lock} value={confirm} onChange={setConfirm} />
 
           {confirm && password !== confirm && (
             <p style={{ fontSize: 11, color: "var(--color-danger)", marginTop: -10, marginBottom: 12 }}>
-              Passwords do not match
+              {t.authPasswordsDoNotMatch}
             </p>
           )}
 
@@ -254,7 +257,7 @@ function RegisterForm({ onSuccess }: {
             onClick={handleSubmit}
             disabled={!firstName || !lastName || !email || password.length === 0 || password !== confirm}
           >
-            <UserPlus size={14} /> Create account
+            <UserPlus size={14} /> {t.authCreateAccount}
           </button>
         </>
       )}
@@ -267,6 +270,7 @@ export default function Auth() {
   const [tab, setTab]             = useState<Tab>("login");
   const [launching] = useState(false);
   const navigate                  = useNavigate();
+  const { t } = useI18n();
 
   const token = localStorage.getItem("auth-token");
 if (token && !launching) return <Navigate to="/home" replace />;
@@ -312,29 +316,29 @@ if (token && !launching) return <Navigate to="/home" replace />;
               }}>
                 <Globe size={18} />
               </div>
-              <span style={{ fontSize: 14, fontWeight: 500 }}>PlanetForge</span>
+              <span style={{ fontSize: 14, fontWeight: 500 }}>{t.appName}</span>
             </div>
 
             {/* Tabs */}
             <div style={{ display: "flex", borderBottom: "1px solid var(--border)" }}>
-              {(["login", "register"] as Tab[]).map((t) => (
+              {(["login", "register"] as Tab[]).map((tabName) => (
                 <button
-                  key={t}
-                  onClick={() => setTab(t)}
+                  key={tabName}
+                  onClick={() => setTab(tabName)}
                   style={{
                     flex: 1,
                     padding: "10px 0",
                     background: "none",
                     border: "none",
-                    borderBottom: `2px solid ${tab === t ? "var(--accent)" : "transparent"}`,
+                    borderBottom: `2px solid ${tab === tabName ? "var(--accent)" : "transparent"}`,
                     marginBottom: -1,
-                    color: tab === t ? "var(--accent)" : "var(--text-muted)",
+                    color: tab === tabName ? "var(--accent)" : "var(--text-muted)",
                     fontSize: 13,
                     cursor: "pointer",
                     transition: "color .15s, border-color .15s",
                   }}
                 >
-                  {t === "login" ? "Sign in" : "Create account"}
+                  {tabName === "login" ? t.authSignIn : t.authCreateAccount}
                 </button>
               ))}
             </div>
@@ -351,15 +355,15 @@ if (token && !launching) return <Navigate to="/home" replace />;
 
             <p style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center", marginTop: 16 }}>
               {tab === "login" ? (
-                <>No account?{" "}
+                <>{t.authNoAccount}{" "}
                   <a style={{ color: "var(--accent)", cursor: "pointer" }} onClick={() => setTab("register")}>
-                    Create one
+                    {t.authCreateOne}
                   </a>
                 </>
               ) : (
-                <>Already have an account?{" "}
+                <>{t.authAlreadyHaveAccount}{" "}
                   <a style={{ color: "var(--accent)", cursor: "pointer" }} onClick={() => setTab("login")}>
-                    Sign in
+                    {t.authSignIn}
                   </a>
                 </>
               )}

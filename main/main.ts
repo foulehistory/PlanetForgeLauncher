@@ -8,6 +8,18 @@ autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = false;
 autoUpdater.forceDevUpdateConfig = true;
 
+function isNoPublishedReleaseError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const lowered = message.toLowerCase();
+
+  // GitHubProvider throws this when /releases/latest does not resolve to a published release.
+  return (
+    lowered.includes("unable to find latest version on github") ||
+    lowered.includes("releases/latest") ||
+    lowered.includes("no published versions")
+  );
+}
+
 
 const iconPath = () => {
   if (process.platform === "win32")   return path.join(__dirname, "../renderer/public/icon.ico");
@@ -108,6 +120,19 @@ ipcMain.handle("update:check", async () => {
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+
+    if (isNoPublishedReleaseError(error)) {
+      console.info("No published release found on GitHub; skipping update banner.");
+      const current = app.getVersion();
+      return {
+        available: false,
+        currentVersion: current,
+        latestVersion: current,
+        releaseNotes: null,
+        error: null,
+      };
+    }
+
     console.error("Update check failed:", message);
 
     return {

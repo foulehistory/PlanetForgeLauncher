@@ -1,8 +1,9 @@
-import { Download, Zap, ArrowRight, Globe, Sword, LogIn, Sparkles } from "lucide-react";
+import { Download, Zap, ArrowRight, Globe, Sword, Sparkles } from "lucide-react";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
 import { useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useI18n } from "../shared/i18n";
 
 
 const featuredFree = [
@@ -13,18 +14,19 @@ const onSale = [
   { id: 1, title: "StarForge",   discount: 60, price: "7,99 €" },
 ];
 
-const stats = [
-  { value: "0", label: "Games in library" },
-  { value: "0",     label: "Active downloads" },
-  { value: "0",    label: "Friends online" },
-  { value: "Free",  label: "This week's gift" },
-];
-
 export default function Home() {
   const location              = useLocation();
   const fromAuth              = location.state?.fromAuth === true;
   const navigate                  = useNavigate();
+  const { t } = useI18n();
   const [showOverlay, setShowOverlay] = useState(fromAuth);
+
+  const stats = [
+    { value: "0", label: t.statsGamesInLibrary },
+    { value: "0", label: t.statsActiveDownloads },
+    { value: "0", label: t.statsFriendsOnline },
+    { value: t.freeLabel, label: t.statsWeeklyGift },
+  ];
 
   const radius    = useMotionValue(0);
   const maskImage = useTransform(radius, r =>
@@ -39,7 +41,7 @@ export default function Home() {
       onComplete: () => setShowOverlay(false),
     });
     return () => controls.stop();
-  }, []);
+  }, [fromAuth, radius]);
 
   return (
     <div style={{ position: "relative" }}>
@@ -58,39 +60,33 @@ export default function Home() {
         />
       )}
 
-      <div className="page">
+        <div className="page">
       {/* ── Hero ─────────────────────────────────────────────────────── */}
 
         <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn btn-primary" onClick={() => { 
-                localStorage.removeItem("auth-token");
-                navigate("/");
-             }}>
-            <LogIn size={14} /> Sign out
-            </button>
-            <button className="btn btn-ghost">Release notes</button>
+          <button className="btn btn-ghost">{t.releaseNotes}</button>
         </div>
 
       <div className="card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "28px 32px", marginBottom: 28 }}>
         <div style={{ maxWidth: 460 }}>
           <div style={{ fontSize: 11, color: "var(--accent)", textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-            <Zap size={13} /> New release
+            <Zap size={13} /> {t.newRelease}
           </div>
           <h1 style={{ fontSize: 26, lineHeight: 1.25, marginBottom: 10 }}>
-            PlanetForge Engine 2.0<br />is now available
+            {t.engineAvailable}
           </h1>
           <p style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 20, maxWidth: 380 }}>
-            Next-gen rendering, real-time ray tracing, and a fully reworked asset pipeline. Build faster, ship smarter.
+            {t.homeHeroDescription}
           </p>
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn btn-primary">
-              <Download size={14} /> Download now
+              <Download size={14} /> {t.downloadNow}
             </button>
-            <button className="btn btn-ghost">Release notes</button>
+            <button className="btn btn-ghost">{t.releaseNotes}</button>
           </div>
         </div>
-        <div style={{ width: 160, height: 120, background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <Globe size={48} style={{ color: "var(--accent)", opacity: .3 }} />
+        <div style={{ width: 160, height: 120, background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <img src="public/icon.ico" sizes="48" style={{ background: "transparent" }}/>
         </div>
       </div>
 
@@ -107,9 +103,9 @@ export default function Home() {
       {/* ── Featured & free ──────────────────────────────────────────── */}
       <div className="section">
         <div className="page-header" style={{ marginBottom: 14 }}>
-          <h3>Featured &amp; free</h3>
+          <h3>{t.featuredAndFree}</h3>
           <button className="btn btn-ghost" style={{ fontSize: 12, padding: "4px 10px" }} onClick={() => navigate("/library")}>
-            See all <ArrowRight size={12} />
+            {t.seeAll} <ArrowRight size={12} />
           </button>
         </div>
 
@@ -120,10 +116,10 @@ export default function Home() {
               <Globe size={40} style={{ color: "var(--text-muted)" }} />
             </div>
             <div style={{ padding: 12 }}>
-              <div className="card-title">Void Recon: Origins</div>
-              <div className="card-subtitle">Action · Sci-Fi · Open World</div>
+              <div className="card-title">{t.featuredMainTitle}</div>
+              <div className="card-subtitle">{t.featuredMainSubtitle}</div>
               <div style={{ marginTop: 8 }}>
-                <span className="badge badge-accent">Free this week</span>
+                <span className="badge badge-accent">{t.freeThisWeek}</span>
               </div>
             </div>
           </div>
@@ -136,9 +132,9 @@ export default function Home() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="card-title" style={{ fontSize: 13 }}>{g.title}</div>
-                <div className="card-subtitle">{g.genre} · Free</div>
+                <div className="card-subtitle">{g.genre} · {t.freeLabel}</div>
               </div>
-              <span className="badge badge-accent">Free</span>
+              <span className="badge badge-accent">{t.freeLabel}</span>
             </div>
           ))}
         </div>
@@ -147,9 +143,9 @@ export default function Home() {
       {/* ── On sale ──────────────────────────────────────────────────── */}
       <div className="section">
         <div className="page-header" style={{ marginBottom: 14 }}>
-          <h3>On sale now</h3>
+          <h3>{t.onSaleNow}</h3>
           <button className="btn btn-ghost" style={{ fontSize: 12, padding: "4px 10px" }}>
-            Browse deals <ArrowRight size={12} />
+            {t.browseDeals} <ArrowRight size={12} />
           </button>
         </div>
 

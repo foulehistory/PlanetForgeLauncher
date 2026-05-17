@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Download, X } from "lucide-react";
+import { useI18n } from "./i18n";
 
 interface UpdateInfo {
   available: boolean;
@@ -10,7 +11,17 @@ interface UpdateInfo {
   error: string | null;
 }
 
+function isNoPublishedReleaseError(error: string): boolean {
+  const lowered = error.toLowerCase();
+  return (
+    lowered.includes("unable to find latest version on github") ||
+    lowered.includes("releases/latest") ||
+    lowered.includes("no published versions")
+  );
+}
+
 export default function UpdateBanner() {
+  const { t } = useI18n();
   const [info, setInfo] = useState<UpdateInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
@@ -25,6 +36,10 @@ export default function UpdateBanner() {
       }
 
       if (result.error) {
+        if (isNoPublishedReleaseError(result.error)) {
+          return;
+        }
+
         console.warn("Update check failed:", result.error);
         setError(result.error);
       }
@@ -62,9 +77,9 @@ export default function UpdateBanner() {
         <span style={{ color: info ? "var(--accent)" : "#ffb800" }}>
           {info
             ? (progress !== null
-              ? `Downloading… ${progress}%`
-              : `v${info.latestVersion} is available (current: v${info.currentVersion})`)
-            : `Update check failed: ${error}`}
+              ? `${t.updateDownloading} ${progress}%`
+              : `v${info.latestVersion} ${t.updateIsAvailable} (${t.updateCurrentVersionLabel}: v${info.currentVersion})`)
+            : `${t.updateCheckFailed}: ${error}`}
         </span>
 
         {info && progress !== null && (
@@ -87,7 +102,7 @@ export default function UpdateBanner() {
               style={{ padding: "4px 12px", fontSize: 12 }}
               onClick={handleInstall}
             >
-              <Download size={13} /> Update now
+              <Download size={13} /> {t.updateNow}
             </button>
           )}
           <button
