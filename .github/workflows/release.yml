@@ -104,7 +104,7 @@ jobs:
         run: npm run build
 
       - name: Package — ${{ matrix.platform }}
-        run: npm run ${{ matrix.script }}
+        run: npm run ${{ matrix.script }}:release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

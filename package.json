@@ -14,7 +14,10 @@
     "package": "npm run build && electron-builder --publish never",
     "package:win": "npm run build && electron-builder --win --publish never",
     "package:mac": "npm run build && electron-builder --mac --publish never",
-    "package:linux": "npm run build && electron-builder --linux --publish never"
+    "package:linux": "npm run build && electron-builder --linux --publish never",
+    "package:win:release": "npm run build && electron-builder --win --publish github",
+    "package:mac:release": "npm run build && electron-builder --mac --publish github",
+    "package:linux:release": "npm run build && electron-builder --linux --publish github"
   },
   "dependencies": {
     "electron-store": "^10.0.0",
