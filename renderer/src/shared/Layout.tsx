@@ -1,4 +1,5 @@
 import { Outlet } from "react-router-dom";
+import UpdateBanner from "./UpdateBanner";
 
 
 export default function Layout() {
@@ -18,6 +19,9 @@ export default function Layout() {
       }}>
         <span>Header</span>
       </header>
+
+      {/* Temporaire: banniere de mise a jour dans la zone du header */}
+      <UpdateBanner />
 
       {/* Contenu de la page courante */}
       <main style={{ flex: 1, overflow: "auto" }}>

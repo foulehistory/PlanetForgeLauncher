@@ -7,10 +7,11 @@ interface ApiResponse<T> {
 }
 
 interface UpdateInfo {
-  available:      boolean;
+  available: boolean;
   currentVersion: string;
-  latestVersion:  string;
-  releaseNotes:   string | null;
+  latestVersion: string;
+  releaseNotes: string | null;
+  error: string | null;
 }
 
 declare global {

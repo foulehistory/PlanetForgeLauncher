@@ -44,8 +44,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "Foulehistory",
-      "repo": "planetforge-launcher"
+      "owner": "foulehistory",
+      "repo": "PlanetForgeLauncher"
     },
     "win": {
       "target": "nsis",

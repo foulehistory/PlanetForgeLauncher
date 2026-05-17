@@ -6,6 +6,7 @@ import { autoUpdater } from "electron-updater";
 
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = false;
+autoUpdater.forceDevUpdateConfig = true;
 
 
 const iconPath = () => {
@@ -81,12 +82,20 @@ ipcMain.handle("auth:register", async (_event, data) => {
 
 // ── isUpdateAvailable ────────────────────────────────────────────────────────
 ipcMain.handle("update:check", async () => {
-  try 
-  {
+  try {
     const result = await autoUpdater.checkForUpdates();
-    if (!result) return { available: false };
-
     const current = app.getVersion();
+
+    if (!result) {
+      return {
+        available: false,
+        currentVersion: current,
+        latestVersion: current,
+        releaseNotes: null,
+        error: "No update metadata was returned by electron-updater.",
+      };
+    }
+
     const latest = result.updateInfo.version;
     const available = latest !== current;
 
@@ -95,9 +104,19 @@ ipcMain.handle("update:check", async () => {
       currentVersion: current,
       latestVersion: latest,
       releaseNotes: result.updateInfo.releaseNotes ?? null,
+      error: null,
     };
-  } catch {
-    return { available: false };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Update check failed:", message);
+
+    return {
+      available: false,
+      currentVersion: app.getVersion(),
+      latestVersion: app.getVersion(),
+      releaseNotes: null,
+      error: message,
+    };
   }
 });
 

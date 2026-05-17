@@ -1,23 +1,33 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, X }            from "lucide-react";
+import { Download, X } from "lucide-react";
 
 interface UpdateInfo {
-  available:      boolean;
+  available: boolean;
   currentVersion: string;
-  latestVersion:  string;
-  releaseNotes:   string | null;
+  latestVersion: string;
+  releaseNotes: string | null;
+  error: string | null;
 }
 
 export default function UpdateBanner() {
-  const [info, setInfo]           = useState<UpdateInfo | null>(null);
-  const [progress, setProgress]   = useState<number | null>(null);
+  const [info, setInfo] = useState<UpdateInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<number | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
   // ── isUpdateAvailable au montage ──────────────────────────────────────────
   useEffect(() => {
     window.api.isUpdateAvailable().then((result) => {
-      if (result.available) setInfo(result);
+      if (result.available) {
+        setInfo(result);
+        return;
+      }
+
+      if (result.error) {
+        console.warn("Update check failed:", result.error);
+        setError(result.error);
+      }
     });
 
     window.api.onUpdateProgress((percent) => setProgress(percent));
@@ -29,7 +39,7 @@ export default function UpdateBanner() {
     window.api.installUpdate();
   };
 
-  if (dismissed || !info) return null;
+  if (dismissed || (!info && !error)) return null;
 
   return (
     <AnimatePresence>
@@ -43,21 +53,21 @@ export default function UpdateBanner() {
           alignItems: "center",
           justifyContent: "space-between",
           padding: "8px 16px",
-          background: "var(--accent-dim)",
-          borderBottom: "1px solid rgba(0,180,216,0.3)",
+          background: info ? "var(--accent-dim)" : "rgba(255, 184, 0, 0.12)",
+          borderBottom: info ? "1px solid rgba(0,180,216,0.3)" : "1px solid rgba(255, 184, 0, 0.35)",
           fontSize: 13,
           gap: 12,
         }}
       >
-        <span style={{ color: "var(--accent)" }}>
-          {progress !== null
-            ? `Downloading… ${progress}%`
-            : `v${info.latestVersion} is available (current: v${info.currentVersion})`
-          }
+        <span style={{ color: info ? "var(--accent)" : "#ffb800" }}>
+          {info
+            ? (progress !== null
+              ? `Downloading… ${progress}%`
+              : `v${info.latestVersion} is available (current: v${info.currentVersion})`)
+            : `Update check failed: ${error}`}
         </span>
 
-        {/* Barre de progression */}
-        {progress !== null && (
+        {info && progress !== null && (
           <div style={{
             flex: 1, maxWidth: 200,
             height: 4, borderRadius: 2,
@@ -71,7 +81,7 @@ export default function UpdateBanner() {
         )}
 
         <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-          {progress === null && (
+          {info && progress === null && (
             <button
               className="btn btn-primary"
               style={{ padding: "4px 12px", fontSize: 12 }}
@@ -80,15 +90,13 @@ export default function UpdateBanner() {
               <Download size={13} /> Update now
             </button>
           )}
-          {progress === null && (
-            <button
-              className="btn btn-ghost"
-              style={{ padding: "4px 8px" }}
-              onClick={() => setDismissed(true)}
-            >
-              <X size={13} />
-            </button>
-          )}
+          <button
+            className="btn btn-ghost"
+            style={{ padding: "4px 8px" }}
+            onClick={() => setDismissed(true)}
+          >
+            <X size={13} />
+          </button>
         </div>
       </motion.div>
     </AnimatePresence>

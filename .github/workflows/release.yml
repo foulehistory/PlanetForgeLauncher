@@ -113,11 +113,14 @@ jobs:
         with:
           name: ${{ matrix.platform }}
           path: |
+            release/latest*.yml
             release/*.exe
             release/*.dmg
             release/*.AppImage
             release/*.deb
             release/*.rpm
+            release/*.zip
+            release/*.blockmap
           if-no-files-found: warn
 
   # ── Crée la GitHub Release avec tous les artifacts ──────────────────────────
