@@ -7,21 +7,16 @@ import { useNavigate } from "react-router-dom";
 
 const featuredFree = [
   { id: 1, title: "Aether Knights", genre: "RPG" },
-  { id: 2, title: "Neon Circuit", genre: "Racing" },
-  { id: 3, title: "Fortress Legacy", genre: "Strategy" },
 ];
 
 const onSale = [
   { id: 1, title: "StarForge",   discount: 60, price: "7,99 €" },
-  { id: 2, title: "Drone Wars X", discount: 40, price: "11,99 €" },
-  { id: 3, title: "Dead Sector",  discount: 75, price: "4,99 €" },
-  { id: 4, title: "Summit Run",   discount: 25, price: "14,99 €" },
 ];
 
 const stats = [
-  { value: "1 247", label: "Games in library" },
-  { value: "3",     label: "Active downloads" },
-  { value: "14",    label: "Friends online" },
+  { value: "0", label: "Games in library" },
+  { value: "0",     label: "Active downloads" },
+  { value: "0",    label: "Friends online" },
   { value: "Free",  label: "This week's gift" },
 ];
 
