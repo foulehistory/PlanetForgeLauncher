@@ -2,6 +2,11 @@ import { app, BrowserWindow, ipcMain, Menu } from "electron";
 import path from "path";
 import { autoUpdater } from "electron-updater";
 
+// Server URL: localhost in dev, public IP when packaged for distribution
+const API_BASE = app.isPackaged
+  ? "http://176.157.240.57:8000"
+  : "http://localhost:8000";
+
 // Auto-updater setup
 
 autoUpdater.autoDownload = false;
@@ -59,7 +64,7 @@ app.on("window-all-closed", () => {
 
 ipcMain.handle("auth:login", async (_event, data: { email: string; password: string }) => {
   try {
-    const response = await fetch("http://localhost:8000/api/auth/login", {
+    const response = await fetch(`${API_BASE}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -76,7 +81,7 @@ ipcMain.handle("auth:login", async (_event, data: { email: string; password: str
 
 ipcMain.handle("auth:register", async (_event, data) => {
   try {
-    const response = await fetch("http://localhost:8000/api/auth/register", {
+    const response = await fetch(`${API_BASE}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -93,7 +98,7 @@ ipcMain.handle("auth:register", async (_event, data) => {
 
 ipcMain.handle("auth:refresh", async (_event, data: { refresh_token: string }) => {
   try {
-    const response = await fetch("http://localhost:8000/api/auth/refresh", {
+    const response = await fetch(`${API_BASE}/api/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),

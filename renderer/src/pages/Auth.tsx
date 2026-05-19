@@ -213,7 +213,8 @@ function RegisterForm({ onSuccess }: {
   const [email, setEmail]         = useState("");
   const [password, setPassword]   = useState("");
   const [confirm, setConfirm]     = useState("");
-    const [status, setStatus] = useState<AnimationStatus>("idle");
+    const [status, setStatus]       = useState<AnimationStatus>("idle");
+  const [errorDetail, setErrorDetail] = useState("");
 
   const handleSubmit = async () => {
     setStatus("loading");
@@ -224,6 +225,7 @@ function RegisterForm({ onSuccess }: {
     ]);
 
     if (!result.ok || !result.data) {
+      setErrorDetail(result.error ?? "");
       setStatus("error");
       await wait(2000);
       setStatus("idle");
@@ -257,7 +259,7 @@ function RegisterForm({ onSuccess }: {
           successText={t.authRegisterSuccessText}
           successSubtext={t.authRegisterSuccessSubtext}
           errorText={t.authRegisterErrorText}
-          errorSubtext={t.authRegisterErrorSubtext}
+          errorSubtext={errorDetail || t.authRegisterErrorSubtext}
         />
       ) : (
         <>
