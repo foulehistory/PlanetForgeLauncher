@@ -91,6 +91,23 @@ ipcMain.handle("auth:register", async (_event, data) => {
   }
 });
 
+ipcMain.handle("auth:refresh", async (_event, data: { refresh_token: string }) => {
+  try {
+    const response = await fetch("http://localhost:8000/api/auth/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    const json = await response.json();
+    if (!response.ok) return { ok: false, error: json.detail ?? "Refresh failed" };
+    return { ok: true, data: json };
+
+  } catch {
+    return { ok: false, error: "Server unreachable" };
+  }
+});
+
 
 // ── isUpdateAvailable ────────────────────────────────────────────────────────
 ipcMain.handle("update:check", async () => {

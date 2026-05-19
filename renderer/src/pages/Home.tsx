@@ -1,4 +1,4 @@
-import { Download, Zap, ArrowRight, Globe, Sword, Sparkles } from "lucide-react";
+import { ArrowRight, Globe, Sword, Sparkles } from "lucide-react";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
 import { useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -61,34 +61,6 @@ export default function Home() {
       )}
 
         <div className="page">
-      {/* ── Hero ─────────────────────────────────────────────────────── */}
-
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn btn-ghost">{t.releaseNotes}</button>
-        </div>
-
-      <div className="card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "28px 32px", marginBottom: 28 }}>
-        <div style={{ maxWidth: 460 }}>
-          <div style={{ fontSize: 11, color: "var(--accent)", textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-            <Zap size={13} /> {t.newRelease}
-          </div>
-          <h1 style={{ fontSize: 26, lineHeight: 1.25, marginBottom: 10 }}>
-            {t.engineAvailable}
-          </h1>
-          <p style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 20, maxWidth: 380 }}>
-            {t.homeHeroDescription}
-          </p>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn btn-primary">
-              <Download size={14} /> {t.downloadNow}
-            </button>
-            <button className="btn btn-ghost">{t.releaseNotes}</button>
-          </div>
-        </div>
-        <div style={{ width: 160, height: 120, background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <img src="public/icon.ico" sizes="48" style={{ background: "transparent" }}/>
-        </div>
-      </div>
 
       {/* ── Stats ────────────────────────────────────────────────────── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 28 }}>

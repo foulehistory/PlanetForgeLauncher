@@ -2,12 +2,19 @@ import { createContext, useContext, useCallback, useMemo, useState, type ReactNo
 
 export type NotificationType = "success" | "error" | "info" | "warning";
 
+export interface NotificationAction {
+  label: string;
+  variant?: "primary" | "danger" | "ghost";
+  onClick: () => void;
+}
+
 export interface Notification {
   id: string;
   type: NotificationType;
   title: string;
   message?: string;
   duration?: number; // ms, 0 = no auto-close
+  actions?: NotificationAction[];
 }
 
 type NotificationContextValue = {

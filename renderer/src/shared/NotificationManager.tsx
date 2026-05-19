@@ -46,6 +46,23 @@ function NotificationItem({ notification }: { notification: Notification }) {
         {notification.message && (
           <div className="notification-message">{notification.message}</div>
         )}
+        {notification.actions && notification.actions.length > 0 && (
+          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+            {notification.actions.map((action, i) => (
+              <button
+                key={i}
+                className={`btn btn-${action.variant ?? "ghost"}`}
+                onClick={() => {
+                  action.onClick();
+                  removeNotification(notification.id);
+                }}
+                style={{ fontSize: 11, height: 26, padding: "0 10px", gap: 4 }}
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <button

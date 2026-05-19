@@ -1,0 +1,615 @@
+﻿import { useState, useEffect, useRef, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { X, UserPlus, ArrowLeft, Send, Users, Check, SmilePlus, Film, UserMinus, Bell } from "lucide-react";
+import { useI18n } from "./i18n";
+import { useNotificationHelpers } from "./Notifications";
+import EmojiPicker from "./EmojiPicker";
+import GifPicker from "./GifPicker";
+
+import { API_BASE } from "../config";
+
+const API = API_BASE;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function getToken(): string | null {
+  const rememberMe = localStorage.getItem("remember-me") === "true";
+  return (rememberMe ? localStorage : sessionStorage).getItem("auth-token");
+}
+
+function getMyUserId(): number | null {
+  const token = getToken();
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return parseInt(payload.user_id);
+  } catch {
+    return null;
+  }
+}
+
+async function apiFetch<T>(path: string, options?: RequestInit): Promise<T | null> {
+  const token = getToken();
+  try {
+    const res = await fetch(`${API}${path}`, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        ...(options?.headers ?? {}),
+      },
+    });
+    if (!res.ok) return null;
+    return res.json() as Promise<T>;
+  } catch {
+    return null;
+  }
+}
+
+// ── Markdown renderer ─────────────────────────────────────────────────────────
+type MdToken = { t: "text" | "bold" | "italic" | "code"; v: string };
+
+function tokenizeMd(text: string): MdToken[] {
+  const tokens: MdToken[] = [];
+  const regex = /\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`/g;
+  let last = 0, match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > last) tokens.push({ t: "text", v: text.slice(last, match.index) });
+    if (match[1] !== undefined)      tokens.push({ t: "bold",   v: match[1] });
+    else if (match[2] !== undefined) tokens.push({ t: "italic", v: match[2] });
+    else if (match[3] !== undefined) tokens.push({ t: "code",   v: match[3] });
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) tokens.push({ t: "text", v: text.slice(last) });
+  return tokens;
+}
+
+function MarkdownText({ text }: { text: string }) {
+  const lines = text.split("\n");
+  return (
+    <>
+      {lines.map((line, li) => (
+        <span key={li}>
+          {li > 0 && <br />}
+          {tokenizeMd(line).map((tok, i) => {
+            if (tok.t === "bold")   return <strong key={i}>{tok.v}</strong>;
+            if (tok.t === "italic") return <em key={i}>{tok.v}</em>;
+            if (tok.t === "code")   return <code key={i} className="md-code">{tok.v}</code>;
+            return <span key={i}>{tok.v}</span>;
+          })}
+        </span>
+      ))}
+    </>
+  );
+}
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+interface FriendData {
+  friendship_id: number;
+  friend_id: number;
+  username: string;
+  display_name: string | null;
+  friend_code: string;
+  last_seen?: string | null;
+}
+
+function isOnline(f: FriendData, onlineIds: Set<number>): boolean {
+  return onlineIds.has(f.friend_id);
+}
+
+interface FriendRequest {
+  friendship_id: number;
+  username: string;
+  display_name: string | null;
+  friend_code: string;
+  created_at: string;
+}
+
+interface MessageData {
+  id: number;
+  sender_id: number;
+  content: string | null;
+  gif_url: string | null;
+  is_read: boolean;
+  created_at: string;
+  username: string;
+  display_name: string | null;
+}
+
+// ── FriendAvatar ──────────────────────────────────────────────────────────────
+function FriendAvatar({ name, size = 32 }: { name: string; size?: number }) {
+  const initials = name
+    .split(/[\s_]+/)
+    .map((w) => w[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%", flexShrink: 0,
+      background: "var(--accent-dim)", border: "1.5px solid var(--accent)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: size * 0.34, fontWeight: 700, color: "var(--accent)", userSelect: "none",
+    }}>
+      {initials}
+    </div>
+  );
+}
+
+// ── FriendsPanel ──────────────────────────────────────────────────────────────
+export default function FriendsPanel({ isOpen, onClose, reloadKey, onlineUserIds = new Set() }: { isOpen: boolean; onClose: () => void; reloadKey?: number; onlineUserIds?: Set<number> }) {
+  const { t } = useI18n();
+  const notify = useNotificationHelpers();
+  const myId = getMyUserId();
+
+  // ── Data state ──────────────────────────────────────────────
+  const [friends,  setFriends]  = useState<FriendData[]>([]);
+  const [requests, setRequests] = useState<FriendRequest[]>([]);
+  const [dataLoading, setDataLoading] = useState(false);
+
+  // ── UI state ────────────────────────────────────────────────
+  const [view, setView]               = useState<"list" | "chat">("list");
+  const [tab,  setTab]                = useState<"friends" | "requests">("friends");
+  const [activeFriend, setActiveFriend] = useState<FriendData | null>(null);
+
+  // ── Add friend form ─────────────────────────────────────────
+  const [adding,     setAdding]     = useState(false);
+  const [friendCode, setFriendCode] = useState("");
+  const [addStatus,  setAddStatus]  = useState<"idle" | "loading" | "ok" | "error">("idle");
+  const [addError,   setAddError]   = useState("");
+
+  // ── Chat state ──────────────────────────────────────────────
+  const [messages,        setMessages]        = useState<MessageData[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messageInput,    setMessageInput]    = useState("");
+  const [showEmoji,       setShowEmoji]       = useState(false);
+  const [showGif,         setShowGif]         = useState(false);
+  const inputRef  = useRef<HTMLInputElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const activeFriendRef = useRef(activeFriend);
+
+  // ── Fetch friends + requests ────────────────────────────────
+  const loadData = useCallback(async () => {
+    setDataLoading(true);
+    const [fr, req] = await Promise.all([
+      apiFetch<FriendData[]>("/api/friends/"),
+      apiFetch<FriendRequest[]>("/api/friends/requests"),
+    ]);
+    if (fr)  setFriends(fr);
+    if (req) setRequests(req);
+    setDataLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) loadData();
+  }, [isOpen, loadData]);
+
+  // Reload when an external action changes reloadKey (e.g. accept from notification)
+  useEffect(() => {
+    if (isOpen && reloadKey !== undefined && reloadKey > 0) loadData();
+  }, [reloadKey, isOpen, loadData]);
+
+  // Auto-refresh friends list every 30s while panel is open (picks up new friends/status)
+  useEffect(() => {
+    if (!isOpen) return;
+    const id = setInterval(loadData, 30_000);
+    return () => clearInterval(id);
+  }, [isOpen, loadData]);
+
+  // ── Reset on close ──────────────────────────────────────────
+  useEffect(() => {
+    if (!isOpen) {
+      const id = setTimeout(() => {
+        setView("list");
+        setActiveFriend(null);
+        setAdding(false);
+        setFriendCode("");
+        setAddStatus("idle");
+        setMessages([]);
+        setShowEmoji(false);
+        setShowGif(false);
+      }, 280);
+      return () => clearTimeout(id);
+    }
+  }, [isOpen]);
+
+  // ── Poll messages ───────────────────────────────────────────
+  // Keep activeFriendRef current so WS handler closure always has latest value
+  useEffect(() => { activeFriendRef.current = activeFriend; }, [activeFriend]);
+
+  // ── WS: real-time messages ─────────────────────────────────────
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const msg = (e as CustomEvent).detail as { type: string; friendship_id?: number; message?: MessageData };
+      if (msg.type !== "new_message") return;
+      if (msg.friendship_id !== activeFriendRef.current?.friendship_id) return;
+      const incoming = msg.message!;
+      setMessages((prev) =>
+        prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]
+      );
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    };
+    window.addEventListener("ws:message", handler);
+    return () => window.removeEventListener("ws:message", handler);
+  }, []);
+
+  // ── Fetch messages (history on chat open + after send) ──────────────────
+  const fetchMessages = useCallback(async (fid: number) => {
+    const data = await apiFetch<MessageData[]>(`/api/messages/${fid}`);
+    if (data) {
+      setMessages(data);
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (view !== "chat" || !activeFriend) return;
+    setMessagesLoading(true);
+    fetchMessages(activeFriend.friendship_id).finally(() => setMessagesLoading(false));
+    // No polling — WS delivers new messages in real-time
+  }, [view, activeFriend, fetchMessages]);
+
+  // ── Close pickers on outside click ─────────────────────────
+  useEffect(() => {
+    if (!showEmoji && !showGif) return;
+    const hide = () => { setShowEmoji(false); setShowGif(false); };
+    document.addEventListener("click", hide, { capture: true });
+    return () => document.removeEventListener("click", hide, { capture: true });
+  }, [showEmoji, showGif]);
+
+  // ── Actions ─────────────────────────────────────────────────
+  const openChat = (friend: FriendData) => {
+    setActiveFriend(friend);
+    setMessages([]);
+    setView("chat");
+  };
+
+  const sendFriendRequest = async () => {
+    if (friendCode.replace("-", "").length < 8) return;
+    setAddStatus("loading");
+    const res = await fetch(`${API}/api/friends/request`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${getToken()}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ friend_code: friendCode }),
+    });
+    if (res.ok) {
+      setAddStatus("ok");
+      setTimeout(() => { setAddStatus("idle"); setFriendCode(""); setAdding(false); }, 2000);
+    } else {
+      const json = await res.json().catch(() => ({}));
+      setAddError((json as { detail?: string }).detail ?? "Erreur");
+      setAddStatus("error");
+      setTimeout(() => setAddStatus("idle"), 3000);
+    }
+  };
+
+  const acceptRequest = async (fid: number) => {
+    await apiFetch(`/api/friends/${fid}/accept`, { method: "PATCH" });
+    await loadData();
+  };
+
+  const declineRequest = async (fid: number) => {
+    await apiFetch(`/api/friends/${fid}/decline`, { method: "PATCH" });
+    await loadData();
+  };
+
+  const removeFriend = async (fid: number) => {
+    await apiFetch(`/api/friends/${fid}`, { method: "DELETE" });
+    await loadData();
+    if (activeFriend?.friendship_id === fid) setView("list");
+  };
+
+  const insertAtCursor = (text: string) => {
+    const input = inputRef.current;
+    if (!input) { setMessageInput((p) => p + text); return; }
+    const s = input.selectionStart ?? messageInput.length;
+    const e = input.selectionEnd   ?? messageInput.length;
+    const next = messageInput.slice(0, s) + text + messageInput.slice(e);
+    setMessageInput(next);
+    setTimeout(() => { input.focus(); input.setSelectionRange(s + text.length, s + text.length); }, 0);
+  };
+
+  const sendMessage = async (gifUrl?: string) => {
+    if (!activeFriend) return;
+    const content = messageInput.trim();
+    if (!content && !gifUrl) return;
+
+    const fid = activeFriend.friendship_id; // capture before awaits
+
+    setMessageInput("");
+    setShowEmoji(false);
+    setShowGif(false);
+
+    // Optimistic — placé immédiatement
+    const optimisticId = Date.now();
+    const optimistic: MessageData = {
+      id: optimisticId,
+      sender_id: myId ?? 0,
+      content: content || null,
+      gif_url: gifUrl ?? null,
+      is_read: true,
+      created_at: new Date().toISOString(),
+      username: "me",
+      display_name: null,
+    };
+    setMessages((prev) => [...prev, optimistic]);
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+
+    try {
+      const res = await fetch(`${API}/api/messages/${fid}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${getToken()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ content: content || null, gif_url: gifUrl ?? null }),
+      });
+      if (res.ok) {
+        await fetchMessages(fid);
+      } else {
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+        notify.error("Message", "Impossible d'envoyer le message");
+      }
+    } catch {
+      // Network error — keep optimistic message visible
+    }
+  };
+
+  const displayName = (f: FriendData | FriendRequest) => f.display_name || f.username;
+  const pendingCount = requests.length;
+
+  // ── Render ───────────────────────────────────────────────────
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0, y: 24, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 24, scale: 0.96 }}
+          transition={{ type: "spring", damping: 28, stiffness: 380, mass: 0.8 }}
+          style={{
+            position: "fixed", bottom: 46, right: 16,
+            width: 308, height: 450, zIndex: 500,
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border)",
+            borderRadius: 12,
+            boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
+            display: "flex", flexDirection: "column", overflow: "hidden",
+          }}
+        >
+          <AnimatePresence mode="wait">
+
+            {/* ════ LIST VIEW ════ */}
+            {view === "list" && (
+              <motion.div key="list"
+                initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.13 }}
+                style={{ display: "flex", flexDirection: "column", height: "100%" }}
+              >
+                {/* Header tabs */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 14px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button className={`fp-tab${tab === "friends" ? " active" : ""}`} onClick={() => setTab("friends")}>
+                      <Users size={12} /> {t.friendsTabFriends}
+                      {friends.length > 0 && <span className="fp-badge">{friends.length}</span>}
+                    </button>
+                    <button className={`fp-tab${tab === "requests" ? " active" : ""}`} onClick={() => setTab("requests")}>
+                      <Bell size={12} /> {t.friendsTabRequests}
+                      {pendingCount > 0 && <span className="fp-badge fp-badge-warn">{pendingCount}</span>}
+                    </button>
+                  </div>
+                  <button className="btn btn-ghost btn-icon" onClick={onClose} style={{ opacity: 0.5 }}>
+                    <X size={13} />
+                  </button>
+                </div>
+
+                {/* ── Friends tab ── */}
+                {tab === "friends" && (
+                  <>
+                    <div style={{ padding: "9px 14px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+                      <AnimatePresence mode="wait">
+                        {adding ? (
+                          <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}>
+                            <div style={{ display: "flex", gap: 5 }}>
+                              <input
+                                className="input"
+                                placeholder={t.friendsAddPlaceholder}
+                                value={friendCode}
+                                onChange={(e) => setFriendCode(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ""))}
+                                onKeyDown={(e) => e.key === "Enter" && sendFriendRequest()}
+                                maxLength={9} autoFocus
+                                style={{ flex: 1, height: 30, fontSize: 12, fontFamily: "monospace", letterSpacing: "0.07em" }}
+                              />
+                              <button className="btn btn-primary btn-icon" onClick={sendFriendRequest}
+                                disabled={addStatus === "loading" || friendCode.replace("-", "").length < 8}
+                                style={{ height: 30, width: 30 }}>
+                                {addStatus === "ok" ? <Check size={12} /> : <Send size={12} />}
+                              </button>
+                              <button className="btn btn-ghost btn-icon" onClick={() => { setAdding(false); setFriendCode(""); }} style={{ height: 30, width: 30, opacity: 0.5 }}>
+                                <X size={12} />
+                              </button>
+                            </div>
+                            {addStatus === "ok"    && <p style={{ fontSize: 10, color: "var(--color-success)", marginTop: 5 }}>Demande envoyee !</p>}
+                            {addStatus === "error" && <p style={{ fontSize: 10, color: "var(--color-danger)",  marginTop: 5 }}>{addError}</p>}
+                          </motion.div>
+                        ) : (
+                          <motion.button key="btn" className="btn btn-ghost" onClick={() => setAdding(true)}
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}
+                            style={{ width: "100%", justifyContent: "center", fontSize: 12, height: 30 }}>
+                            <UserPlus size={13} /> {t.friendsAdd}
+                          </motion.button>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    <div style={{ flex: 1, overflowY: "auto", padding: "6px 0" }}>
+                      {dataLoading ? (
+                        <div className="fp-empty"><span style={{ fontSize: 12, color: "var(--text-muted)" }}>...</span></div>
+                      ) : friends.length === 0 ? (
+                        <div className="fp-empty">
+                          <Users size={28} style={{ opacity: 0.3 }} />
+                          <span style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center" }}>{t.friendsNoFriends}</span>
+                        </div>
+                      ) : (
+                        [...friends].sort((a, b) => (isOnline(b, onlineUserIds) ? 1 : 0) - (isOnline(a, onlineUserIds) ? 1 : 0)).map((f) => {
+                          const online = isOnline(f, onlineUserIds);
+                          return (
+                          <div key={f.friendship_id} className="friend-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 14px" }}>
+                            <button onClick={() => openChat(f)} style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
+                              <div style={{ position: "relative", flexShrink: 0 }}>
+                                <FriendAvatar name={displayName(f)} />
+                                <span style={{
+                                  position: "absolute", bottom: 1, right: 1,
+                                  width: 8, height: 8, borderRadius: "50%",
+                                  background: online ? "#4caf50" : "var(--text-muted)",
+                                  border: "1.5px solid var(--bg-elevated)",
+                                }} />
+                              </div>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {displayName(f)}
+                                </div>
+                                <div style={{ fontSize: 10, color: online ? "#4caf50" : "var(--text-muted)" }}>
+                                  {online ? t.friendsOnline : t.friendsOffline}
+                                </div>
+                              </div>
+                            </button>
+                            <button className="btn btn-ghost btn-icon" onClick={() => removeFriend(f.friendship_id)} title={t.friendsRemove} style={{ opacity: 0.35, flexShrink: 0 }}>
+                              <UserMinus size={13} />
+                            </button>
+                          </div>
+                        );})
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* ── Requests tab ── */}
+                {tab === "requests" && (
+                  <div style={{ flex: 1, overflowY: "auto", padding: "6px 0" }}>
+                    {requests.length === 0 ? (
+                      <div className="fp-empty">
+                        <Bell size={24} style={{ opacity: 0.3 }} />
+                        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{t.friendsRequestsEmpty}</span>
+                      </div>
+                    ) : (
+                      requests.map((r) => (
+                        <div key={r.friendship_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border)" }}>
+                          <FriendAvatar name={displayName(r)} size={34} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>{displayName(r)}</div>
+                            <div style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "monospace" }}>{r.friend_code}</div>
+                          </div>
+                          <button className="btn btn-primary btn-icon" onClick={() => acceptRequest(r.friendship_id)} title={t.friendsAccept} style={{ height: 28, width: 28 }}>
+                            <Check size={12} />
+                          </button>
+                          <button className="btn btn-ghost btn-icon" onClick={() => declineRequest(r.friendship_id)} title={t.friendsDecline} style={{ height: 28, width: 28, opacity: 0.5 }}>
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* ════ CHAT VIEW ════ */}
+            {view === "chat" && activeFriend && (
+              <motion.div key="chat"
+                initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }}
+                transition={{ duration: 0.13 }}
+                style={{ display: "flex", flexDirection: "column", height: "100%" }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+                  <button className="btn btn-ghost btn-icon" onClick={() => setView("list")} style={{ opacity: 0.65 }}>
+                    <ArrowLeft size={13} />
+                  </button>
+                  <FriendAvatar name={displayName(activeFriend)} />
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {displayName(activeFriend)}
+                  </span>
+                  <button className="btn btn-ghost btn-icon" onClick={onClose} style={{ opacity: 0.5 }}>
+                    <X size={13} />
+                  </button>
+                </div>
+
+                {/* Messages */}
+                <div style={{ flex: 1, overflowY: "auto", padding: "10px 14px", display: "flex", flexDirection: "column", gap: 6 }}>
+                  {messagesLoading && messages.length === 0 ? (
+                    <div className="fp-empty"><span style={{ fontSize: 11, color: "var(--text-muted)" }}>...</span></div>
+                  ) : messages.length === 0 ? (
+                    <div className="fp-empty"><span style={{ fontSize: 11, color: "var(--text-muted)" }}>{t.friendsChatStart}</span></div>
+                  ) : (
+                    messages.map((m) => {
+                      const fromMe = m.sender_id === myId || m.username === "me";
+                      return (
+                        <div key={m.id} style={{ display: "flex", justifyContent: fromMe ? "flex-end" : "flex-start" }}>
+                          {!fromMe && (
+                            <div style={{ marginRight: 6, flexShrink: 0, alignSelf: "flex-end" }}>
+                              <FriendAvatar name={m.display_name || m.username} size={22} />
+                            </div>
+                          )}
+                          <div className={`msg-bubble ${fromMe ? "msg-mine" : "msg-theirs"}`}>
+                            {m.gif_url ? (
+                              <img src={m.gif_url} alt="GIF" style={{ maxWidth: 200, maxHeight: 160, borderRadius: 6, display: "block" }} />
+                            ) : (
+                              <MarkdownText text={m.content ?? ""} />
+                            )}
+                            <div className="msg-time">
+                              {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                  <div ref={bottomRef} />
+                </div>
+
+                {/* Pickers overlay */}
+                <AnimatePresence>
+                  {(showEmoji || showGif) && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
+                      transition={{ duration: 0.12 }}
+                      style={{ position: "absolute", bottom: 52, left: 0, right: 0, zIndex: 10, background: "var(--bg-elevated)", borderTop: "1px solid var(--border)" }}
+                    >
+                      {showEmoji && <EmojiPicker onEmoji={(em) => { insertAtCursor(em); setShowEmoji(false); }} />}
+                      {showGif   && <GifPicker   onGif={(url) => { sendMessage(url); setShowGif(false); }} />}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Compose bar */}
+                <div style={{ padding: "8px 10px", borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+                  <button className="btn btn-ghost btn-icon"
+                    onClick={(e) => { e.stopPropagation(); setShowGif(false); setShowEmoji((v) => !v); }}
+                    style={{ flexShrink: 0, opacity: showEmoji ? 1 : 0.55, color: showEmoji ? "var(--accent)" : undefined }} title="Emoji">
+                    <SmilePlus size={15} />
+                  </button>
+                  <button className="btn btn-ghost btn-icon"
+                    onClick={(e) => { e.stopPropagation(); setShowEmoji(false); setShowGif((v) => !v); }}
+                    style={{ flexShrink: 0, opacity: showGif ? 1 : 0.55, color: showGif ? "var(--accent)" : undefined }} title="GIF">
+                    <Film size={15} />
+                  </button>
+                  <input
+                    ref={inputRef}
+                    className="input"
+                    placeholder={t.friendsMessagePlaceholder}
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                    style={{ flex: 1, height: 32, fontSize: 12 }}
+                  />
+                  <button className="btn btn-primary btn-icon" onClick={() => sendMessage()} disabled={!messageInput.trim()}
+                    style={{ height: 32, width: 32, flexShrink: 0 }}>
+                    <Send size={13} />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+          </AnimatePresence>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}

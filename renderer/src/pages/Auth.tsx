@@ -78,29 +78,36 @@ function LoginForm({ onSuccess }: {
   onSuccess: () => void;
 }) {
   const { t } = useI18n();
-  const [email, setEmail]       = useState("");
-  const [password, setPassword] = useState("");
-  const [status, setStatus]     = useState<AnimationStatus>("idle");
+  const [email, setEmail]           = useState("");
+  const [password, setPassword]     = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
+  const [status, setStatus]         = useState<AnimationStatus>("idle");
 
 const handleSubmit = async () => {
   setStatus("loading");
 
   const [result] = await Promise.all([
-    window.api.login({ email, password }),
+    window.api.login({ email, password, remember_me: rememberMe }),
     wait(900),
   ]);
 
-  if (!result.ok) {
+  if (!result.ok || !result.data) {
     setStatus("error");
     await wait(2000);
     setStatus("idle");
     return;
   }
 
-  localStorage.setItem("auth-token", result.data.access_token);
+  const storage = rememberMe ? localStorage : sessionStorage;
+  storage.setItem("auth-token",        result.data.access_token);
+  storage.setItem("refresh-token",     result.data.refresh_token);
+  storage.setItem("auth-expires-at",   result.data.access_expires_at);
+  storage.setItem("refresh-expires-at", result.data.refresh_expires_at);
+  localStorage.setItem("remember-me",  rememberMe ? "true" : "false");
+
   setStatus("success");
-  await wait(1200); // laisse l'animation success visible
-  onSuccess();      // navigate ici, propre et prévisible
+  await wait(1200);
+  onSuccess();
 };
 
   return (
@@ -144,6 +151,35 @@ const handleSubmit = async () => {
             <a style={{ fontSize: 12, color: "var(--accent)", cursor: "pointer" }}>{t.authForgotPassword}</a>
           </div>
 
+          <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, cursor: "pointer", userSelect: "none" }}>
+            <span style={{
+              position: "relative",
+              width: 14,
+              height: 14,
+              borderRadius: "var(--radius-sm)",
+              border: `1.5px solid ${rememberMe ? "var(--accent)" : "var(--border-hover)"}`,
+              background: rememberMe ? "var(--accent)" : "var(--bg-elevated)",
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "background 0.15s, border-color 0.15s",
+            }}>
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                style={{ position: "absolute", opacity: 0, width: "100%", height: "100%", cursor: "pointer", margin: 0 }}
+              />
+              {rememberMe && (
+                <svg width="9" height="7" viewBox="0 0 9 7" fill="none" style={{ pointerEvents: "none" }}>
+                  <path d="M1 3.5L3.5 6L8 1" stroke="var(--bg-base)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </span>
+            <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{t.authRememberMe}</span>
+          </label>
+
           <button
             className="btn btn-primary"
             style={{ width: "100%", justifyContent: "center" }}
@@ -173,8 +209,7 @@ function RegisterForm({ onSuccess }: {
   onSuccess: () => void;
 }) {
   const { t } = useI18n();
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName]   = useState("");
+  const [username, setUsername]   = useState("");
   const [email, setEmail]         = useState("");
   const [password, setPassword]   = useState("");
   const [confirm, setConfirm]     = useState("");
@@ -184,18 +219,23 @@ function RegisterForm({ onSuccess }: {
     setStatus("loading");
 
     const [result] = await Promise.all([
-      window.api.register({ username: `${firstName} ${lastName}`, email, password }),
+      window.api.register({ username, email, password }),
       wait(900),
     ]);
 
-    if (!result.ok) {
+    if (!result.ok || !result.data) {
       setStatus("error");
       await wait(2000);
       setStatus("idle");
       return;
     }
 
-    localStorage.setItem("auth-token", result.data.access_token);
+    sessionStorage.setItem("auth-token",         result.data.access_token);
+    sessionStorage.setItem("refresh-token",      result.data.refresh_token);
+    sessionStorage.setItem("auth-expires-at",    result.data.access_expires_at);
+    sessionStorage.setItem("refresh-expires-at", result.data.refresh_expires_at);
+    localStorage.setItem("remember-me", "false");
+
     setStatus("success");
     await wait(1200);
     onSuccess();
@@ -221,10 +261,13 @@ function RegisterForm({ onSuccess }: {
         />
       ) : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <InputField label={t.authFirstNameLabel} placeholder={t.authFirstNamePlaceholder} icon={User} value={firstName} onChange={setFirstName} />
-            <InputField label={t.authLastNameLabel}  placeholder={t.authLastNamePlaceholder}  icon={User} value={lastName}  onChange={setLastName} />
-          </div>
+          <InputField
+            label={t.authUsernameLabel}
+            placeholder={t.authUsernamePlaceholder}
+            icon={User}
+            value={username}
+            onChange={setUsername}
+          />
 
           <InputField label={t.authEmailLabel} type="email" placeholder={t.authEmailPlaceholder} icon={Mail} value={email} onChange={setEmail} />
 
@@ -255,7 +298,7 @@ function RegisterForm({ onSuccess }: {
             className="btn btn-primary"
             style={{ width: "100%", justifyContent: "center" }}
             onClick={handleSubmit}
-            disabled={!firstName || !lastName || !email || password.length === 0 || password !== confirm}
+            disabled={!username || !email || password.length === 0 || password !== confirm}
           >
             <UserPlus size={14} /> {t.authCreateAccount}
           </button>
@@ -272,7 +315,9 @@ export default function Auth() {
   const navigate                  = useNavigate();
   const { t } = useI18n();
 
-  const token = localStorage.getItem("auth-token");
+  const _rememberMe = localStorage.getItem("remember-me") === "true";
+  const _storage    = _rememberMe ? localStorage : sessionStorage;
+  const token       = _storage.getItem("auth-token");
 if (token && !launching) return <Navigate to="/home" replace />;
 
   const onSuccess = () => navigate("/home", { state: { fromAuth: true } });

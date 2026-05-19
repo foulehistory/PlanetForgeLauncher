@@ -81,16 +81,38 @@ type Dictionary = {
   authRegisterSuccessSubtext: string;
   authRegisterErrorText: string;
   authRegisterErrorSubtext: string;
-  authFirstNameLabel: string;
-  authFirstNamePlaceholder: string;
-  authLastNameLabel: string;
-  authLastNamePlaceholder: string;
+  authUsernameLabel: string;
+  authUsernamePlaceholder: string;
   authConfirmPasswordLabel: string;
   authPasswordsDoNotMatch: string;
   authCreateAccount: string;
   authNoAccount: string;
   authCreateOne: string;
   authAlreadyHaveAccount: string;
+  authRememberMe: string;
+  navProfile: string;
+  profileMemberSince: string;
+  profileGamesOwned: string;
+  profileTotalPlaytime: string;
+  profileHours: string;
+  profileAchievements: string;
+  profileEditDisplayName: string;
+  profileSaveChanges: string;
+  navFriends: string;
+  friendsTitle: string;
+  friendsAdd: string;
+  friendsAddPlaceholder: string;
+  friendsNoFriends: string;
+  friendsOnline: string;
+  friendsOffline: string;
+  friendsMessagePlaceholder: string;
+  friendsChatStart: string;
+  friendsTabFriends: string;
+  friendsTabRequests: string;
+  friendsRequestsEmpty: string;
+  friendsAccept: string;
+  friendsDecline: string;
+  friendsRemove: string;
 };
 
 const dictionaries: Record<Language, Dictionary> = {
@@ -158,17 +180,39 @@ const dictionaries: Record<Language, Dictionary> = {
     authRegisterSuccessText: "Compte cree !",
     authRegisterSuccessSubtext: "Bienvenue sur PlanetForge",
     authRegisterErrorText: "Inscription echouee",
-    authRegisterErrorSubtext: "Email deja utilise",
-    authFirstNameLabel: "Prenom",
-    authFirstNamePlaceholder: "Alex",
-    authLastNameLabel: "Nom",
-    authLastNamePlaceholder: "Dev",
+    authRegisterErrorSubtext: "Email ou pseudo deja utilise",
+    authUsernameLabel: "Pseudo",
+    authUsernamePlaceholder: "MonPseudo42",
     authConfirmPasswordLabel: "Confirmer le mot de passe",
     authPasswordsDoNotMatch: "Les mots de passe ne correspondent pas",
     authCreateAccount: "Creer un compte",
     authNoAccount: "Pas de compte ?",
     authCreateOne: "En creer un",
     authAlreadyHaveAccount: "Vous avez deja un compte ?",
+    authRememberMe: "Rester connecte",
+    navProfile: "Profil",
+    profileMemberSince: "Membre depuis",
+    profileGamesOwned: "Jeux possedes",
+    profileTotalPlaytime: "Temps de jeu",
+    profileHours: "h",
+    profileAchievements: "Succes",
+    profileEditDisplayName: "Modifier le pseudo",
+    profileSaveChanges: "Enregistrer",
+    navFriends: "Amis",
+    friendsTitle: "Amis",
+    friendsAdd: "Ajouter un ami",
+    friendsAddPlaceholder: "Code ami (ex: ABCD-1234)",
+    friendsNoFriends: "Aucun ami pour l'instant",
+    friendsOnline: "En ligne",
+    friendsOffline: "Hors ligne",
+    friendsMessagePlaceholder: "Message...",
+    friendsChatStart: "Debut de la conversation",
+    friendsTabFriends: "Amis",
+    friendsTabRequests: "Demandes",
+    friendsRequestsEmpty: "Aucune demande",
+    friendsAccept: "Accepter",
+    friendsDecline: "Refuser",
+    friendsRemove: "Retirer",
   },
   en: {
     appName: "PlanetForge Launcher",
@@ -234,17 +278,39 @@ const dictionaries: Record<Language, Dictionary> = {
     authRegisterSuccessText: "Account created!",
     authRegisterSuccessSubtext: "Welcome to PlanetForge",
     authRegisterErrorText: "Registration failed",
-    authRegisterErrorSubtext: "Email already in use",
-    authFirstNameLabel: "First name",
-    authFirstNamePlaceholder: "Alex",
-    authLastNameLabel: "Last name",
-    authLastNamePlaceholder: "Dev",
+    authRegisterErrorSubtext: "Email or username already taken",
+    authUsernameLabel: "Username",
+    authUsernamePlaceholder: "MyUsername42",
     authConfirmPasswordLabel: "Confirm password",
     authPasswordsDoNotMatch: "Passwords do not match",
     authCreateAccount: "Create account",
     authNoAccount: "No account?",
     authCreateOne: "Create one",
     authAlreadyHaveAccount: "Already have an account?",
+    authRememberMe: "Stay signed in",
+    navProfile: "Profile",
+    profileMemberSince: "Member since",
+    profileGamesOwned: "Games owned",
+    profileTotalPlaytime: "Total playtime",
+    profileHours: "h",
+    profileAchievements: "Achievements",
+    profileEditDisplayName: "Edit display name",
+    profileSaveChanges: "Save",
+    navFriends: "Friends",
+    friendsTitle: "Friends",
+    friendsAdd: "Add a friend",
+    friendsAddPlaceholder: "Friend code (ex: ABCD-1234)",
+    friendsNoFriends: "No friends yet",
+    friendsOnline: "Online",
+    friendsOffline: "Offline",
+    friendsMessagePlaceholder: "Message...",
+    friendsChatStart: "Start of conversation",
+    friendsTabFriends: "Friends",
+    friendsTabRequests: "Requests",
+    friendsRequestsEmpty: "No requests",
+    friendsAccept: "Accept",
+    friendsDecline: "Decline",
+    friendsRemove: "Remove",
   },
   es: {
     appName: "PlanetForge Launcher",
@@ -310,17 +376,39 @@ const dictionaries: Record<Language, Dictionary> = {
     authRegisterSuccessText: "Cuenta creada!",
     authRegisterSuccessSubtext: "Bienvenido a PlanetForge",
     authRegisterErrorText: "Registro fallido",
-    authRegisterErrorSubtext: "Email ya en uso",
-    authFirstNameLabel: "Nombre",
-    authFirstNamePlaceholder: "Alex",
-    authLastNameLabel: "Apellido",
-    authLastNamePlaceholder: "Dev",
+    authRegisterErrorSubtext: "Email o usuario ya en uso",
+    authUsernameLabel: "Usuario",
+    authUsernamePlaceholder: "MiUsuario42",
     authConfirmPasswordLabel: "Confirmar contrasena",
     authPasswordsDoNotMatch: "Las contrasenas no coinciden",
     authCreateAccount: "Crear cuenta",
     authNoAccount: "No tienes cuenta?",
     authCreateOne: "Crear una",
     authAlreadyHaveAccount: "Ya tienes cuenta?",
+    authRememberMe: "Mantener sesion",
+    navProfile: "Perfil",
+    profileMemberSince: "Miembro desde",
+    profileGamesOwned: "Juegos",
+    profileTotalPlaytime: "Tiempo de juego",
+    profileHours: "h",
+    profileAchievements: "Logros",
+    profileEditDisplayName: "Editar nombre",
+    profileSaveChanges: "Guardar",
+    navFriends: "Amigos",
+    friendsTitle: "Amigos",
+    friendsAdd: "Agregar amigo",
+    friendsAddPlaceholder: "Codigo amigo (ej: ABCD-1234)",
+    friendsNoFriends: "Sin amigos aun",
+    friendsOnline: "En linea",
+    friendsOffline: "Desconectado",
+    friendsMessagePlaceholder: "Mensaje...",
+    friendsChatStart: "Inicio de la conversacion",
+    friendsTabFriends: "Amigos",
+    friendsTabRequests: "Solicitudes",
+    friendsRequestsEmpty: "Sin solicitudes",
+    friendsAccept: "Aceptar",
+    friendsDecline: "Rechazar",
+    friendsRemove: "Eliminar",
   },
   de: {
     appName: "PlanetForge Launcher",
@@ -386,17 +474,39 @@ const dictionaries: Record<Language, Dictionary> = {
     authRegisterSuccessText: "Konto erstellt!",
     authRegisterSuccessSubtext: "Willkommen bei PlanetForge",
     authRegisterErrorText: "Registrierung fehlgeschlagen",
-    authRegisterErrorSubtext: "Email wird bereits verwendet",
-    authFirstNameLabel: "Vorname",
-    authFirstNamePlaceholder: "Alex",
-    authLastNameLabel: "Nachname",
-    authLastNamePlaceholder: "Dev",
+    authRegisterErrorSubtext: "Email oder Benutzername vergeben",
+    authUsernameLabel: "Benutzername",
+    authUsernamePlaceholder: "MeinName42",
     authConfirmPasswordLabel: "Passwort bestatigen",
     authPasswordsDoNotMatch: "Passworter stimmen nicht uberein",
     authCreateAccount: "Konto erstellen",
     authNoAccount: "Noch kein Konto?",
     authCreateOne: "Eins erstellen",
     authAlreadyHaveAccount: "Bereits ein Konto?",
+    authRememberMe: "Angemeldet bleiben",
+    navProfile: "Profil",
+    profileMemberSince: "Mitglied seit",
+    profileGamesOwned: "Spiele",
+    profileTotalPlaytime: "Spielzeit",
+    profileHours: "h",
+    profileAchievements: "Erfolge",
+    profileEditDisplayName: "Name bearbeiten",
+    profileSaveChanges: "Speichern",
+    navFriends: "Freunde",
+    friendsTitle: "Freunde",
+    friendsAdd: "Freund hinzufugen",
+    friendsAddPlaceholder: "Freundescode (z.B. ABCD-1234)",
+    friendsNoFriends: "Noch keine Freunde",
+    friendsOnline: "Online",
+    friendsOffline: "Offline",
+    friendsMessagePlaceholder: "Nachricht...",
+    friendsChatStart: "Beginn der Unterhaltung",
+    friendsTabFriends: "Freunde",
+    friendsTabRequests: "Anfragen",
+    friendsRequestsEmpty: "Keine Anfragen",
+    friendsAccept: "Annehmen",
+    friendsDecline: "Ablehnen",
+    friendsRemove: "Entfernen",
   },
 };
 
