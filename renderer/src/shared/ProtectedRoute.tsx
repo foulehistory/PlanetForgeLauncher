@@ -1,5 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { API_BASE } from "../config";
 
 function getStorage(): Storage {
   return localStorage.getItem("remember-me") === "true" ? localStorage : sessionStorage;
@@ -22,7 +23,6 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
       const storage      = getStorage();
       const token        = storage.getItem("auth-token");
       const refreshToken = storage.getItem("refresh-token");
-      const tokenExp     = storage.getItem("auth-expires-at");
       const refreshExp   = storage.getItem("refresh-expires-at");
       const now          = Date.now();
 
@@ -31,16 +31,19 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
         return;
       }
 
-      if (token && tokenExp && new Date(tokenExp).getTime() > now) {
-        setAuthState("ok");
-        return;
-      }
-
+      // Toujours valider côté serveur via le refresh token.
+      // Ça garantit que l'utilisateur existe encore en DB,
+      // même si le JWT local n'est pas encore expiré.
       if (refreshToken && refreshExp && new Date(refreshExp).getTime() > now) {
-        const result = await window.api.refresh({ refresh_token: refreshToken });
-        if (result.ok && result.data) {
-          storage.setItem("auth-token",      result.data.access_token);
-          storage.setItem("auth-expires-at", result.data.access_expires_at);
+        const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          storage.setItem("auth-token",      data.access_token);
+          storage.setItem("auth-expires-at", data.access_expires_at);
           setAuthState("ok");
           return;
         }

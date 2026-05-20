@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Lock, User, LogIn, UserPlus, Globe } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import StatusAnimation, { type AnimationStatus } from "../shared/StatusAnimation";
+import { API_BASE } from "../config";
 import LaunchTransition from "../shared/LaunchTransition";
 import { useI18n } from "../shared/i18n";
 
@@ -87,7 +88,15 @@ const handleSubmit = async () => {
   setStatus("loading");
 
   const [result] = await Promise.all([
-    window.api.login({ email, password, remember_me: rememberMe }),
+    fetch(`${API_BASE}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, remember_me: rememberMe }),
+    }).then(async (res) => {
+      const json = await res.json();
+      if (!res.ok) return { ok: false as const, error: json.detail ?? "Unauthorized" };
+      return { ok: true as const, data: json };
+    }).catch(() => ({ ok: false as const, error: "Server unreachable" })),
     wait(900),
   ]);
 
@@ -220,7 +229,15 @@ function RegisterForm({ onSuccess }: {
     setStatus("loading");
 
     const [result] = await Promise.all([
-      window.api.register({ username, email, password }),
+      fetch(`${API_BASE}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, email, password }),
+      }).then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) return { ok: false as const, error: json.detail ?? "Registration failed" };
+        return { ok: true as const, data: json };
+      }).catch(() => ({ ok: false as const, error: "Server unreachable" })),
       wait(900),
     ]);
 

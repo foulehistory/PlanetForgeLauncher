@@ -1,5 +1,6 @@
 import { Gamepad2, Clock, Calendar, Pencil, Check, X, Trophy, Copy, Users } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { API_BASE } from "../config";
 import { useI18n } from "../shared/i18n";
@@ -31,8 +32,19 @@ function getInitials(name: string): string {
     .toUpperCase();
 }
 
+function clearTokens() {
+  const rememberMe = localStorage.getItem("remember-me") === "true";
+  const storage = rememberMe ? localStorage : sessionStorage;
+  storage.removeItem("auth-token");
+  storage.removeItem("refresh-token");
+  storage.removeItem("auth-expires-at");
+  storage.removeItem("refresh-expires-at");
+  localStorage.removeItem("remember-me");
+}
+
 export default function Profile() {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const [profile, setProfile]     = useState<ProfileData | null>(null);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(false);
@@ -48,6 +60,11 @@ export default function Profile() {
         const res = await fetch(`${API_BASE}/api/users/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (res.status === 401 || res.status === 404) {
+          clearTokens();
+          navigate("/", { replace: true });
+          return;
+        }
         if (!res.ok) { setError(true); setLoading(false); return; }
         const data: ProfileData = await res.json();
         setProfile(data);

@@ -39,12 +39,16 @@ function createWindow() {
     height: 800,
     icon: iconPath(),
     title: "PlanetForge Games Launcher",
+    show: false,
+    backgroundColor: "#0d0d0f",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
-      nodeIntegration: false, 
+      nodeIntegration: false,
     },
   });
+
+  win.once("ready-to-show", () => win.show());
 
   if (app.isPackaged) {
     win.loadFile(path.join(process.resourcesPath, "app/renderer/dist/index.html"));
