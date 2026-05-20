@@ -41,17 +41,11 @@ export default function Layout() {
   const wsRef = useRef<WebSocket | null>(null);
   const myId  = getMyUserId();
 
-  // ── Native OS notifications (shown when app is not focused) ─────────────
-  useEffect(() => {
-    if (typeof Notification !== "undefined" && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-  }, []);
-
+  // ── Native OS notifications via Electron IPC (works when app is not focused) ──
+  type ElectronAPI = { showNotification?: (title: string, body: string) => void };
   const nativeNotif = (title: string, body: string) => {
-    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
-    if (document.hasFocus()) return; // app is focused — use in-app toasts
-    new Notification(title, { body, icon: "/icon.png", silent: false });
+    if (document.hasFocus()) return; // app focused — in-app toasts are enough
+    (window as Window & { api?: ElectronAPI }).api?.showNotification?.(title, body);
   };
 
   // Track known request IDs to avoid duplicate notifications

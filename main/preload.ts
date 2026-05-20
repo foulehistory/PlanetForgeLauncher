@@ -9,4 +9,5 @@ contextBridge.exposeInMainWorld("api", {
   isUpdateAvailable: () => ipcRenderer.invoke("update:check"),
   installUpdate: () => ipcRenderer.invoke("update:download-and-install"),
   onUpdateProgress: (cb: (percent: number) => void) => ipcRenderer.on("update:progress", (_e, percent) => cb(percent)),
+  showNotification: (title: string, body: string) => ipcRenderer.send("notify:show", { title, body }),
 });

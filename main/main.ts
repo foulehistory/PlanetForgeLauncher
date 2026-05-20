@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, Notification } from "electron";
 import path from "path";
 import { autoUpdater } from "electron-updater";
 
@@ -60,6 +60,13 @@ function createWindow() {
 app.whenReady().then(() => {
     createWindow();
     Menu.setApplicationMenu(null);
+});
+
+// ── Native OS notification ────────────────────────────────────────────────────────
+ipcMain.on("notify:show", (_event, data: { title: string; body: string }) => {
+  if (Notification.isSupported()) {
+    new Notification({ title: data.title, body: data.body, icon: iconPath() }).show();
+  }
 });
 
 app.on("window-all-closed", () => {
