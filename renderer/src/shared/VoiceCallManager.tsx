@@ -19,7 +19,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, PhoneOff, Phone, Headphones, HeadphoneOff } from "lucide-react";
+import { Mic, MicOff, PhoneOff, Phone, Headphones, HeadphoneOff, Monitor, MonitorOff, X } from "lucide-react";
 
 // ICE servers: Google STUN + free OpenRelay TURN (fallback when STUN alone can't pierce NAT)
 const ICE_CONFIG: RTCConfiguration = {
@@ -79,6 +79,17 @@ interface Props {
   myId: number | null;
 }
 
+interface ScreenSource {
+  id: string;
+  name: string;
+  thumbnail: string;  // data URL
+  appIcon: string | null;
+}
+
+type ScreenElectronAPI = {
+  getScreenSources?: () => Promise<ScreenSource[]>;
+};
+
 export default function VoiceCallManager({ wsRef, myId }: Props) {
   const [incomingCall, setIncomingCall]   = useState<IncomingCall | null>(null);
   const [activeTarget, setActiveTarget]   = useState<CallTarget | null>(null);
@@ -86,6 +97,12 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
   const [muted,        setMuted]          = useState(false);
   const [deafened,     setDeafened]       = useState(false);
   const [duration,     setDuration]       = useState(0);
+  const [isScreenSharing,    setIsScreenSharing]    = useState(false);
+  const [screenPickerOpen,   setScreenPickerOpen]   = useState(false);
+  const [screenSources,      setScreenSources]      = useState<ScreenSource[]>([]);
+  const [remoteScreenStream, setRemoteScreenStream] = useState<MediaStream | null>(null);
+  const [remoteScreenFrom,   setRemoteScreenFrom]   = useState<string | null>(null);
+  const [screenMinimized,    setScreenMinimized]    = useState(false);
 
   const peers          = useRef<Map<number, PeerState>>(new Map());
   const localStream     = useRef<MediaStream | null>(null);
@@ -97,7 +114,17 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
   const iceBuffer       = useRef<Map<number, RTCIceCandidateInit[]>>(new Map());
   // activeTargetRef: stale-closure-safe copy of activeTarget for callbacks
   const activeTargetRef = useRef<CallTarget | null>(null);
+  // Screen sharing refs
+  const screenStream    = useRef<MediaStream | null>(null);
+  const screenSenders   = useRef<Map<number, RTCRtpSender[]>>(new Map());
+  const remoteVideoRef  = useRef<HTMLVideoElement | null>(null);
   useEffect(() => { activeTargetRef.current = activeTarget; }, [activeTarget]);
+  // Attach remote screen stream to the <video> element whenever it changes
+  useEffect(() => {
+    if (!remoteVideoRef.current) return;
+    remoteVideoRef.current.srcObject = remoteScreenStream;
+    if (remoteScreenStream) remoteVideoRef.current.play().catch(() => {});
+  }, [remoteScreenStream]);
 
   // ─── Ringtone helpers ───────────────────────────────────────────────────────
   const playRingtone = useCallback(() => {
@@ -156,10 +183,16 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
     // Add local tracks
     localAudio.getTracks().forEach((t) => pc.addTrack(t, localAudio));
 
-    // Play remote audio as soon as tracks arrive
+    // Play remote audio / reveal remote screen share when tracks arrive
     pc.ontrack = (ev) => {
-      audioEl.srcObject = ev.streams[0];
-      audioEl.play().catch(() => { /* autoplay policy — rare in Electron */ });
+      if (ev.track.kind === "audio") {
+        audioEl.srcObject = ev.streams[0];
+        audioEl.play().catch(() => { /* autoplay policy — rare in Electron */ });
+      } else if (ev.track.kind === "video") {
+        setRemoteScreenStream(ev.streams[0]);
+        setRemoteScreenFrom(name);
+        setScreenMinimized(false);
+      }
     };
 
     // Send ICE candidates via WS signaling
@@ -196,6 +229,16 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
     });
     peers.current.clear();
     iceBuffer.current.clear();
+
+    // Clean up any active screen share
+    if (screenStream.current) {
+      screenStream.current.getTracks().forEach((t) => t.stop());
+      screenStream.current = null;
+    }
+    screenSenders.current.clear();
+    setIsScreenSharing(false);
+    setRemoteScreenStream(null);
+    setRemoteScreenFrom(null);
 
     if (localStream.current) {
       localStream.current.getTracks().forEach((t) => t.stop());
@@ -302,6 +345,65 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
     setIncomingCall(null);
   }, [incomingCall, wsSend, stopRingtone]);
 
+  // ─── Screen share ─────────────────────────────────────────────────────────
+  const stopScreenShare = useCallback(() => {
+    if (!screenStream.current) return;
+    const stream = screenStream.current;
+    screenSenders.current.forEach((senders, userId) => {
+      const peer = peers.current.get(userId);
+      if (peer) senders.forEach((s) => { try { peer.pc.removeTrack(s); } catch { /* ignore */ } });
+    });
+    screenSenders.current.clear();
+    stream.getTracks().forEach((t) => t.stop());
+    screenStream.current = null;
+    setIsScreenSharing(false);
+    peers.current.forEach((_, userId) => wsSend({ type: "rtc_screen_stop", to_user_id: userId }));
+  }, [wsSend]);
+
+  const openScreenPicker = useCallback(async () => {
+    const api = (window as Window & { api?: ScreenElectronAPI }).api;
+    if (!api?.getScreenSources) return;
+    try {
+      const sources = await api.getScreenSources();
+      setScreenSources(sources);
+      setScreenPickerOpen(true);
+    } catch { /* ignore */ }
+  }, []);
+
+  const startScreenShare = useCallback(async (sourceId: string) => {
+    setScreenPickerOpen(false);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const stream = await (navigator.mediaDevices as any).getUserMedia({
+        audio: false,
+        video: {
+          mandatory: {
+            chromeMediaSource: "desktop",
+            chromeMediaSourceId: sourceId,
+            maxWidth: 1920,
+            maxHeight: 1080,
+            maxFrameRate: 30,
+          },
+        },
+      }) as MediaStream;
+      screenStream.current = stream;
+      setIsScreenSharing(true);
+      const videoTrack = stream.getVideoTracks()[0];
+      videoTrack.onended = () => stopScreenShare();
+      for (const [userId, peer] of peers.current) {
+        const sender = peer.pc.addTrack(videoTrack, stream);
+        const existing = screenSenders.current.get(userId) ?? [];
+        existing.push(sender);
+        screenSenders.current.set(userId, existing);
+        const offer = await peer.pc.createOffer();
+        await peer.pc.setLocalDescription(offer);
+        if (peer.pc.localDescription) {
+          wsSend({ type: "rtc_renego_offer", to_user_id: userId, sdp: peer.pc.localDescription });
+        }
+      }
+    } catch { /* user cancelled or permission denied */ }
+  }, [wsSend, stopScreenShare]);
+
   // Play ringtone for the callee when an incoming call arrives
   useEffect(() => {
     if (incomingCall) playRingtone();
@@ -377,6 +479,25 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
           buf.push(msg.candidate as RTCIceCandidateInit);
           iceBuffer.current.set(fromId, buf);
         }
+      } else if (type === "rtc_renego_offer") {
+        // Renegotiation offer — remote peer added a screen share track
+        const fromId = msg.from_user_id as number;
+        const peer   = peers.current.get(fromId);
+        if (peer) {
+          await peer.pc.setRemoteDescription(msg.sdp as RTCSessionDescriptionInit);
+          const answer = await peer.pc.createAnswer();
+          await peer.pc.setLocalDescription(answer);
+          wsSend({ type: "rtc_renego_answer", to_user_id: fromId, sdp: answer });
+        }
+      } else if (type === "rtc_renego_answer") {
+        const fromId = msg.from_user_id as number;
+        const peer   = peers.current.get(fromId);
+        if (peer) {
+          await peer.pc.setRemoteDescription(msg.sdp as RTCSessionDescriptionInit);
+        }
+      } else if (type === "rtc_screen_stop") {
+        setRemoteScreenStream(null);
+        setRemoteScreenFrom(null);
       } else if (type === "rtc_hang_up" || type === "rtc_group_hang_up") {
         // Dismiss incoming call modal if the caller cancelled before we answered
         stopRingtone();
@@ -501,6 +622,16 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
             >
               {muted ? <MicOff size={14} /> : <Mic size={14} />}
             </button>
+            {callStatus === "connected" && (
+              <button
+                className="btn btn-ghost btn-icon"
+                title={isScreenSharing ? "Arrêter le partage d'écran" : "Partager l'écran"}
+                onClick={isScreenSharing ? stopScreenShare : openScreenPicker}
+                style={{ height: 32, width: 32, color: isScreenSharing ? "var(--color-primary)" : "var(--text-secondary)" }}
+              >
+                {isScreenSharing ? <MonitorOff size={14} /> : <Monitor size={14} />}
+              </button>
+            )}
             <button
               className="btn"
               style={{ flex: 1, height: 32, fontSize: 12, background: "var(--color-danger)", color: "#fff", border: "none", gap: 6 }}
@@ -508,6 +639,130 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
             >
               <PhoneOff size={13} /> Raccrocher
             </button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Screen source picker modal ───────────────────────────────── */}
+      {screenPickerOpen && (
+        <motion.div
+          key="screen-picker"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          style={{
+            position: "fixed", inset: 0, zIndex: 10000,
+            background: "rgba(0,0,0,0.72)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setScreenPickerOpen(false); }}
+        >
+          <motion.div
+            initial={{ scale: 0.94, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: 12,
+              padding: "20px 24px",
+              width: 700,
+              maxHeight: "80vh",
+              overflowY: "auto",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>
+                Choisir quoi partager
+              </span>
+              <button className="btn btn-ghost btn-icon" style={{ height: 28, width: 28 }} onClick={() => setScreenPickerOpen(false)}>
+                <X size={14} />
+              </button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: 12 }}>
+              {screenSources.map((src) => (
+                <button
+                  key={src.id}
+                  onClick={() => startScreenShare(src.id)}
+                  style={{
+                    background: "var(--bg-elevated)",
+                    border: "2px solid var(--border)",
+                    borderRadius: 8, padding: 8, cursor: "pointer",
+                    textAlign: "center", transition: "border-color 0.15s",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--color-primary)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
+                >
+                  <img
+                    src={src.thumbnail} alt={src.name}
+                    style={{ width: "100%", height: 110, objectFit: "contain", borderRadius: 4, background: "#000" }}
+                  />
+                  <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 4, justifyContent: "center" }}>
+                    {src.appIcon && <img src={src.appIcon} alt="" style={{ width: 14, height: 14, flexShrink: 0 }} />}
+                    <span style={{ fontSize: 11, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 150 }}>
+                      {src.name}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* ── Remote screen share overlay ────────────────────────────── */}
+      {remoteScreenStream && (
+        <motion.div
+          key="remote-screen"
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.96 }}
+          style={{
+            position: "fixed",
+            ...(screenMinimized
+              ? { bottom: 20, left: 20, width: 300, height: 170, zIndex: 8900 }
+              : { inset: 36, zIndex: 8900 }),
+            background: "#000",
+            borderRadius: 10,
+            border: "1px solid var(--border)",
+            overflow: "hidden",
+            boxShadow: "0 16px 48px rgba(0,0,0,0.8)",
+            transition: "all 0.2s ease",
+          }}
+        >
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            style={{ width: "100%", height: "100%", objectFit: "contain" }}
+          />
+          {/* Overlay controls bar */}
+          <div style={{
+            position: "absolute", top: 0, left: 0, right: 0,
+            padding: "6px 10px",
+            background: "linear-gradient(to bottom, rgba(0,0,0,0.65), transparent)",
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+          }}>
+            <span style={{ fontSize: 11, color: "#fff", opacity: 0.9 }}>
+              🖥️ {remoteScreenFrom} partage son écran
+            </span>
+            <div style={{ display: "flex", gap: 4 }}>
+              <button
+                className="btn btn-ghost btn-icon"
+                style={{ height: 24, width: 24, color: "#fff" }}
+                title={screenMinimized ? "Agrandir" : "Réduire"}
+                onClick={() => setScreenMinimized((m) => !m)}
+              >
+                {screenMinimized ? <Monitor size={12} /> : <MonitorOff size={12} />}
+              </button>
+              <button
+                className="btn btn-ghost btn-icon"
+                style={{ height: 24, width: 24, color: "#fff" }}
+                title="Fermer la vue (le partage continue)"
+                onClick={() => { setRemoteScreenStream(null); setRemoteScreenFrom(null); }}
+              >
+                <X size={12} />
+              </button>
+            </div>
           </div>
         </motion.div>
       )}

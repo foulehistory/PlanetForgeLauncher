@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, Notification } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, Notification, desktopCapturer } from "electron";
 import path from "path";
 import { autoUpdater } from "electron-updater";
 
@@ -67,6 +67,21 @@ ipcMain.on("notify:show", (_event, data: { title: string; body: string }) => {
   if (Notification.isSupported()) {
     new Notification({ title: data.title, body: data.body, icon: iconPath() }).show();
   }
+});
+
+// ── Screen capture sources (for screen share picker) ─────────────────────────
+ipcMain.handle("get-screen-sources", async () => {
+  const sources = await desktopCapturer.getSources({
+    types: ["screen", "window"],
+    thumbnailSize: { width: 320, height: 180 },
+    fetchWindowIcons: true,
+  });
+  return sources.map((s) => ({
+    id:        s.id,
+    name:      s.name,
+    thumbnail: s.thumbnail.toDataURL(),
+    appIcon:   s.appIcon ? s.appIcon.toDataURL() : null,
+  }));
 });
 
 app.on("window-all-closed", () => {
