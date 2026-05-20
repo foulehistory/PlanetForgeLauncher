@@ -1,6 +1,6 @@
 import { ArrowRight, Globe, Sword, Sparkles } from "lucide-react";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
-import { useLocation } from "react-router-dom";
+import { useLocation, useOutletContext } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useI18n } from "../shared/i18n";
@@ -20,11 +20,12 @@ export default function Home() {
   const navigate                  = useNavigate();
   const { t } = useI18n();
   const [showOverlay, setShowOverlay] = useState(fromAuth);
+  const { onlineCount = 0 } = useOutletContext<{ onlineCount: number }>();
 
   const stats = [
     { value: "0", label: t.statsGamesInLibrary },
     { value: "0", label: t.statsActiveDownloads },
-    { value: "0", label: t.statsFriendsOnline },
+    { value: String(onlineCount), label: t.statsFriendsOnline },
     { value: t.freeLabel, label: t.statsWeeklyGift },
   ];
 

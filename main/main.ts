@@ -15,7 +15,7 @@ autoUpdater.forceDevUpdateConfig = true;
 
 function isNoPublishedReleaseError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  const lowered = message.toLowerCase();
+  const lowered = message.toLowerCase(); 
 
   // GitHubProvider throws this when /releases/latest does not resolve to a published release.
   return (

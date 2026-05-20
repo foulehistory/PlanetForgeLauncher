@@ -1,6 +1,6 @@
 {
   "name": "launcher",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "PlanetForge Game Launcher",
   "repository": "https://github.com/foulehistory/PlanetForgeLauncher",
   "author": "PlanetForge",
@@ -52,7 +52,8 @@
     },
     "win": {
       "target": "nsis",
-      "icon": "renderer/public/icon.ico"
+      "icon": "renderer/public/icon.ico",
+      "artifactName": "PlanetForge-Setup-${version}.${ext}"
     },
     "mac": {
       "target": "dmg",

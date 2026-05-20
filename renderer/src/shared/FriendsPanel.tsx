@@ -83,12 +83,21 @@ function MarkdownText({ text }: { text: string }) {
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+const STATUSES: Array<{ value: string; label: string; color: string }> = [
+  { value: "online",    label: "En ligne",        color: "#4caf50" },
+  { value: "away",      label: "Absent",           color: "#ffc107" },
+  { value: "busy",      label: "Ne pas déranger",  color: "#f44336" },
+  { value: "invisible", label: "Invisible",        color: "#607d8b" },
+];
+
 interface FriendData {
   friendship_id: number;
   friend_id: number;
   username: string;
   display_name: string | null;
   friend_code: string;
+  avatar_path: string | null;
+  status: string;
   last_seen?: string | null;
 }
 
@@ -96,11 +105,31 @@ function isOnline(f: FriendData, onlineIds: Set<number>): boolean {
   return onlineIds.has(f.friend_id);
 }
 
+function friendStatusColor(online: boolean, status: string): string {
+  if (!online) return "var(--text-muted)";
+  switch (status) {
+    case "away":    return "#ffc107";
+    case "busy":    return "#f44336";
+    default:        return "#4caf50"; // online
+  }
+}
+
+function friendStatusLabel(online: boolean, status: string, labels: { online: string; offline: string }): string {
+  if (!online) return labels.offline;
+  switch (status) {
+    case "away": return "Absent";
+    case "busy": return "Ne pas déranger";
+    default:     return labels.online;
+  }
+}
+
 interface FriendRequest {
   friendship_id: number;
+  requester_id: number;
   username: string;
   display_name: string | null;
   friend_code: string;
+  avatar_path: string | null;
   created_at: string;
 }
 
@@ -116,7 +145,8 @@ interface MessageData {
 }
 
 // ── FriendAvatar ──────────────────────────────────────────────────────────────
-function FriendAvatar({ name, size = 32 }: { name: string; size?: number }) {
+function FriendAvatar({ name, size = 32, userId }: { name: string; size?: number; userId?: number }) {
+  const [imgError, setImgError] = useState(false);
   const initials = name
     .split(/[\s_]+/)
     .map((w) => w[0])
@@ -124,14 +154,25 @@ function FriendAvatar({ name, size = 32 }: { name: string; size?: number }) {
     .slice(0, 2)
     .join("")
     .toUpperCase();
+  const avatarSrc = userId && !imgError ? `${API}/api/users/${userId}/avatar` : null;
   return (
     <div style={{
       width: size, height: size, borderRadius: "50%", flexShrink: 0,
       background: "var(--accent-dim)", border: "1.5px solid var(--accent)",
       display: "flex", alignItems: "center", justifyContent: "center",
       fontSize: size * 0.34, fontWeight: 700, color: "var(--accent)", userSelect: "none",
+      overflow: "hidden",
     }}>
-      {initials}
+      {avatarSrc ? (
+        <img
+          src={avatarSrc}
+          alt={name}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        initials
+      )}
     </div>
   );
 }
@@ -152,6 +193,11 @@ export default function FriendsPanel({ isOpen, onClose, reloadKey, onlineUserIds
   const [tab,  setTab]                = useState<"friends" | "requests">("friends");
   const [activeFriend, setActiveFriend] = useState<FriendData | null>(null);
 
+  // ── Own status ────────────────────────────────────────────────
+  const [myStatus,         setMyStatus]         = useState<string>("online");
+  const [statusPickerOpen, setStatusPickerOpen] = useState(false);
+  const statusPickerRef = useRef<HTMLDivElement>(null);
+
   // ── Add friend form ─────────────────────────────────────────
   const [adding,     setAdding]     = useState(false);
   const [friendCode, setFriendCode] = useState("");
@@ -167,6 +213,25 @@ export default function FriendsPanel({ isOpen, onClose, reloadKey, onlineUserIds
   const inputRef  = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const activeFriendRef = useRef(activeFriend);
+
+  // ── Fetch own status on mount ────────────────────────────────
+  useEffect(() => {
+    apiFetch<{ status: string }>("/api/users/me").then((data) => {
+      if (data?.status) setMyStatus(data.status);
+    });
+  }, []);
+
+  // ── Close status picker on outside click ────────────────────
+  useEffect(() => {
+    if (!statusPickerOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (statusPickerRef.current && !statusPickerRef.current.contains(e.target as Node)) {
+        setStatusPickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [statusPickerOpen]);
 
   // ── Fetch friends + requests ────────────────────────────────
   const loadData = useCallback(async () => {
@@ -220,14 +285,28 @@ export default function FriendsPanel({ isOpen, onClose, reloadKey, onlineUserIds
   // ── WS: real-time messages ─────────────────────────────────────
   useEffect(() => {
     const handler = (e: Event) => {
-      const msg = (e as CustomEvent).detail as { type: string; friendship_id?: number; message?: MessageData };
-      if (msg.type !== "new_message") return;
-      if (msg.friendship_id !== activeFriendRef.current?.friendship_id) return;
-      const incoming = msg.message!;
-      setMessages((prev) =>
-        prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]
-      );
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+      const msg = (e as CustomEvent).detail as {
+        type: string;
+        friendship_id?: number;
+        message?: MessageData;
+        user_id?: number;
+        status?: string;
+      };
+      if (msg.type === "new_message") {
+        if (msg.friendship_id !== activeFriendRef.current?.friendship_id) return;
+        const incoming = msg.message!;
+        setMessages((prev) =>
+          prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]
+        );
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+      } else if (msg.type === "friend_status" && msg.user_id && msg.status) {
+        // Real-time status update from PATCH /me/status or reconnect
+        setFriends((prev) =>
+          prev.map((f) =>
+            f.friend_id === msg.user_id ? { ...f, status: msg.status! } : f
+          )
+        );
+      }
     };
     window.addEventListener("ws:message", handler);
     return () => window.removeEventListener("ws:message", handler);
@@ -352,6 +431,18 @@ export default function FriendsPanel({ isOpen, onClose, reloadKey, onlineUserIds
     }
   };
 
+  const handleMyStatusChange = async (newStatus: string) => {
+    if (newStatus === myStatus) { setStatusPickerOpen(false); return; }
+    setMyStatus(newStatus);
+    setStatusPickerOpen(false);
+    const token = getToken();
+    await fetch(`${API}/api/users/me/status`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ status: newStatus }),
+    });
+  };
+
   const displayName = (f: FriendData | FriendRequest) => f.display_name || f.username;
   const pendingCount = requests.length;
 
@@ -395,9 +486,70 @@ export default function FriendsPanel({ isOpen, onClose, reloadKey, onlineUserIds
                       {pendingCount > 0 && <span className="fp-badge fp-badge-warn">{pendingCount}</span>}
                     </button>
                   </div>
-                  <button className="btn btn-ghost btn-icon" onClick={onClose} style={{ opacity: 0.5 }}>
-                    <X size={13} />
-                  </button>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {/* Status dot — click to change own presence */}
+                    <div style={{ position: "relative" }} ref={statusPickerRef}>
+                      <button
+                        onClick={() => setStatusPickerOpen((o) => !o)}
+                        title={`Mon statut : ${STATUSES.find((s) => s.value === myStatus)?.label ?? myStatus}`}
+                        style={{
+                          width: 18, height: 18, borderRadius: "50%",
+                          background: STATUSES.find((s) => s.value === myStatus)?.color ?? "#4caf50",
+                          border: "2.5px solid var(--bg-elevated)",
+                          cursor: "pointer", padding: 0, flexShrink: 0,
+                          outline: "none",
+                          boxShadow: statusPickerOpen
+                            ? `0 0 0 3px ${(STATUSES.find((s) => s.value === myStatus)?.color ?? "#4caf50")}44`
+                            : "none",
+                          transition: "box-shadow 0.15s",
+                        }}
+                      />
+                      <AnimatePresence>
+                        {statusPickerOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -4, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -4, scale: 0.95 }}
+                            transition={{ duration: 0.1 }}
+                            style={{
+                              position: "absolute", right: 0, top: "calc(100% + 8px)",
+                              background: "var(--bg-elevated)",
+                              border: "1px solid var(--border)",
+                              borderRadius: 8,
+                              boxShadow: "0 8px 28px rgba(0,0,0,0.45)",
+                              padding: 4,
+                              minWidth: 178,
+                              zIndex: 600,
+                            }}
+                          >
+                            {STATUSES.map((s) => (
+                              <button
+                                key={s.value}
+                                onClick={() => handleMyStatusChange(s.value)}
+                                style={{
+                                  display: "flex", alignItems: "center", gap: 9,
+                                  width: "100%", padding: "7px 10px",
+                                  background: myStatus === s.value ? "var(--accent-dim)" : "transparent",
+                                  border: "none", borderRadius: 6,
+                                  cursor: "pointer",
+                                  color: myStatus === s.value ? "var(--accent)" : "var(--text-primary)",
+                                  fontSize: 12,
+                                  transition: "background 0.1s",
+                                }}
+                              >
+                                <span style={{ width: 9, height: 9, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
+                                {s.label}
+                                {myStatus === s.value && <Check size={10} style={{ marginLeft: "auto", opacity: 0.6 }} />}
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                    <button className="btn btn-ghost btn-icon" onClick={onClose} style={{ opacity: 0.5 }}>
+                      <X size={13} />
+                    </button>
+                  </div>
                 </div>
 
                 {/* ── Friends tab ── */}
@@ -450,15 +602,17 @@ export default function FriendsPanel({ isOpen, onClose, reloadKey, onlineUserIds
                       ) : (
                         [...friends].sort((a, b) => (isOnline(b, onlineUserIds) ? 1 : 0) - (isOnline(a, onlineUserIds) ? 1 : 0)).map((f) => {
                           const online = isOnline(f, onlineUserIds);
+                          const dotColor = friendStatusColor(online, f.status || "online");
+                          const statusText = friendStatusLabel(online, f.status || "online", { online: t.friendsOnline, offline: t.friendsOffline });
                           return (
                           <div key={f.friendship_id} className="friend-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 14px" }}>
                             <button onClick={() => openChat(f)} style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
                               <div style={{ position: "relative", flexShrink: 0 }}>
-                                <FriendAvatar name={displayName(f)} />
+                                <FriendAvatar name={displayName(f)} userId={f.friend_id} />
                                 <span style={{
                                   position: "absolute", bottom: 1, right: 1,
                                   width: 8, height: 8, borderRadius: "50%",
-                                  background: online ? "#4caf50" : "var(--text-muted)",
+                                  background: dotColor,
                                   border: "1.5px solid var(--bg-elevated)",
                                 }} />
                               </div>
@@ -466,8 +620,8 @@ export default function FriendsPanel({ isOpen, onClose, reloadKey, onlineUserIds
                                 <div style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                   {displayName(f)}
                                 </div>
-                                <div style={{ fontSize: 10, color: online ? "#4caf50" : "var(--text-muted)" }}>
-                                  {online ? t.friendsOnline : t.friendsOffline}
+                                <div style={{ fontSize: 10, color: dotColor }}>
+                                  {statusText}
                                 </div>
                               </div>
                             </button>
@@ -492,7 +646,7 @@ export default function FriendsPanel({ isOpen, onClose, reloadKey, onlineUserIds
                     ) : (
                       requests.map((r) => (
                         <div key={r.friendship_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderBottom: "1px solid var(--border)" }}>
-                          <FriendAvatar name={displayName(r)} size={34} />
+                          <FriendAvatar name={displayName(r)} size={34} userId={r.requester_id} />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>{displayName(r)}</div>
                             <div style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "monospace" }}>{r.friend_code}</div>
@@ -522,7 +676,7 @@ export default function FriendsPanel({ isOpen, onClose, reloadKey, onlineUserIds
                   <button className="btn btn-ghost btn-icon" onClick={() => setView("list")} style={{ opacity: 0.65 }}>
                     <ArrowLeft size={13} />
                   </button>
-                  <FriendAvatar name={displayName(activeFriend)} />
+                  <FriendAvatar name={displayName(activeFriend)} userId={activeFriend.friend_id} />
                   <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {displayName(activeFriend)}
                   </span>
@@ -544,7 +698,7 @@ export default function FriendsPanel({ isOpen, onClose, reloadKey, onlineUserIds
                         <div key={m.id} style={{ display: "flex", justifyContent: fromMe ? "flex-end" : "flex-start" }}>
                           {!fromMe && (
                             <div style={{ marginRight: 6, flexShrink: 0, alignSelf: "flex-end" }}>
-                              <FriendAvatar name={m.display_name || m.username} size={22} />
+                              <FriendAvatar name={m.display_name || m.username} size={22} userId={m.sender_id} />
                             </div>
                           )}
                           <div className={`msg-bubble ${fromMe ? "msg-mine" : "msg-theirs"}`}>

@@ -25,6 +25,9 @@ export default function Layout() {
   const currentYear = new Date().getFullYear();
   const [friendsPanelOpen, setFriendsPanelOpen] = useState(false);
   const [friendsReloadKey, setFriendsReloadKey] = useState(0);
+  const [unreadMsg, setUnreadMsg] = useState(0);
+  const friendsPanelOpenRef = useRef(false);
+  useEffect(() => { friendsPanelOpenRef.current = friendsPanelOpen; }, [friendsPanelOpen]);
 
   // Track known request IDs to avoid duplicate notifications
   const knownRequestIds = useRef<Set<number>>(new Set());
@@ -133,6 +136,32 @@ export default function Layout() {
                 },
               ],
             });
+
+          } else if (msg.type === "new_message") {
+            if (!friendsPanelOpenRef.current) {
+              setUnreadMsg((n) => n + 1);
+              const m = msg.message as Record<string, unknown> | undefined;
+              if (m) {
+                const sender = (m.display_name as string | null) || (m.username as string) || "";
+                addNotification({
+                  type: "info",
+                  title: tRef.current.friendsTabFriends,
+                  message: sender,
+                  duration: 4000,
+                });
+              }
+            }
+
+          } else if (msg.type === "achievement_unlocked") {
+            const ach = msg.achievement as Record<string, unknown> | undefined;
+            if (ach) {
+              addNotification({
+                type:     "info",
+                title:    `${ach.icon ?? "🏆"} Succès débloqué !`,
+                message:  String(ach.title ?? ""),
+                duration: 6000,
+              });
+            }
           }
         } catch { /* ignore */ }
       };
@@ -259,7 +288,7 @@ export default function Layout() {
             transition={{ duration: 0.18, ease: "easeInOut" }}
             style={{ width: "100%", height: "100%" }}
           >
-            <Outlet />
+            <Outlet context={{ onlineCount: onlineUserIds.size }} />
           </motion.div>
         </AnimatePresence>
       </main>
@@ -305,9 +334,28 @@ export default function Layout() {
             borderColor: friendsPanelOpen ? "var(--accent)" : undefined,
             background: friendsPanelOpen ? "var(--accent-dim)" : undefined,
           }}
-          onClick={() => setFriendsPanelOpen((o) => !o)}
+          onClick={() => {
+            setFriendsPanelOpen((o) => !o);
+            setUnreadMsg(0);
+          }}
         >
           <Users size={13} /> {t.navFriends}
+          {unreadMsg > 0 && (
+            <span style={{
+              marginLeft: 4,
+              background: "var(--accent)",
+              color: "white",
+              borderRadius: 8,
+              padding: "0 5px",
+              fontSize: 10,
+              fontWeight: 700,
+              lineHeight: "16px",
+              minWidth: 16,
+              textAlign: "center",
+            }}>
+              {unreadMsg > 9 ? "9+" : unreadMsg}
+            </span>
+          )}
         </button>
       </footer>
 
