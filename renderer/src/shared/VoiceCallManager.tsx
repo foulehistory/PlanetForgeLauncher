@@ -21,7 +21,22 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mic, MicOff, PhoneOff, Phone, Headphones, HeadphoneOff } from "lucide-react";
 
-const STUN = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+// ICE servers: Google STUN + free OpenRelay TURN (fallback when STUN alone can't pierce NAT)
+const ICE_CONFIG: RTCConfiguration = {
+  iceServers: [
+    { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+    {
+      urls: [
+        "turn:openrelay.metered.ca:80",
+        "turn:openrelay.metered.ca:443",
+        "turns:openrelay.metered.ca:443?transport=tcp",
+      ],
+      username:   "openrelayproject",
+      credential: "openrelayproject",
+    },
+  ],
+  iceCandidatePoolSize: 10,
+};
 const API  = (window as Window & { __API_BASE__?: string }).__API_BASE__
            ?? (import.meta as { env?: { VITE_API_BASE?: string } }).env?.VITE_API_BASE
            ?? "http://localhost:8000";
@@ -72,12 +87,14 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
   const [deafened,     setDeafened]       = useState(false);
   const [duration,     setDuration]       = useState(0);
 
-  const peers        = useRef<Map<number, PeerState>>(new Map());
-  const localStream   = useRef<MediaStream | null>(null);
-  const durationTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const ringtoneEl    = useRef<HTMLAudioElement | null>(null);
-  const dmTimeoutRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const aloneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const peers          = useRef<Map<number, PeerState>>(new Map());
+  const localStream     = useRef<MediaStream | null>(null);
+  const durationTimer   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const ringtoneEl      = useRef<HTMLAudioElement | null>(null);
+  const dmTimeoutRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aloneTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Buffer ICE candidates that arrive before the peer connection is created (callee side)
+  const iceBuffer       = useRef<Map<number, RTCIceCandidateInit[]>>(new Map());
   // activeTargetRef: stale-closure-safe copy of activeTarget for callbacks
   const activeTargetRef = useRef<CallTarget | null>(null);
   useEffect(() => { activeTargetRef.current = activeTarget; }, [activeTarget]);
@@ -126,19 +143,22 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
     localAudio: MediaStream,
     isInitiator: boolean,
   ): Promise<RTCPeerConnection> => {
-    const pc = new RTCPeerConnection(STUN);
+    const pc = new RTCPeerConnection(ICE_CONFIG);
     const audioEl = new Audio();
     audioEl.autoplay = true;
+    audioEl.style.display = "none";
+    document.body.appendChild(audioEl); // must be in DOM for Electron autoplay
 
     // Add local tracks
     localAudio.getTracks().forEach((t) => pc.addTrack(t, localAudio));
 
-    // Play remote audio
+    // Play remote audio as soon as tracks arrive
     pc.ontrack = (ev) => {
       audioEl.srcObject = ev.streams[0];
+      audioEl.play().catch(() => { /* autoplay policy — rare in Electron */ });
     };
 
-    // Send ICE candidates
+    // Send ICE candidates via WS signaling
     pc.onicecandidate = (ev) => {
       if (ev.candidate) {
         wsSend({ type: "rtc_ice", to_user_id: userId, candidate: ev.candidate.toJSON() });
@@ -168,8 +188,10 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
     peers.current.forEach(({ pc, audioEl }) => {
       pc.close();
       audioEl.srcObject = null;
+      audioEl.remove(); // detach from DOM
     });
     peers.current.clear();
+    iceBuffer.current.clear();
 
     if (localStream.current) {
       localStream.current.getTracks().forEach((t) => t.stop());
@@ -252,6 +274,14 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
 
     const pc = await createPeer(incomingCall.fromUserId, incomingCall.fromName, stream, false);
     await pc.setRemoteDescription(incomingCall.sdp);
+
+    // Flush any ICE candidates that arrived before we accepted
+    const buffered = iceBuffer.current.get(incomingCall.fromUserId) ?? [];
+    iceBuffer.current.delete(incomingCall.fromUserId);
+    for (const c of buffered) {
+      try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch { /* ignore */ }
+    }
+
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     wsSend({ type: "rtc_answer", to_user_id: incomingCall.fromUserId, sdp: answer });
@@ -333,10 +363,15 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
       } else if (type === "rtc_ice") {
         const fromId = msg.from_user_id as number;
         const peer   = peers.current.get(fromId);
-        if (peer && msg.candidate) {
+        if (peer) {
           try {
             await peer.pc.addIceCandidate(new RTCIceCandidate(msg.candidate as RTCIceCandidateInit));
           } catch { /* ignore late candidates */ }
+        } else {
+          // No peer yet (callee hasn't accepted) — buffer for later
+          const buf = iceBuffer.current.get(fromId) ?? [];
+          buf.push(msg.candidate as RTCIceCandidateInit);
+          iceBuffer.current.set(fromId, buf);
         }
       } else if (type === "rtc_hang_up" || type === "rtc_group_hang_up") {
         // Dismiss incoming call modal if the caller cancelled before we answered
