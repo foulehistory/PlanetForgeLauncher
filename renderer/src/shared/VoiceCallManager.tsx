@@ -105,6 +105,7 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
   const [remoteScreenStream, setRemoteScreenStream] = useState<MediaStream | null>(null);
   const [remoteScreenFrom,   setRemoteScreenFrom]   = useState<string | null>(null);
   const [screenMinimized,    setScreenMinimized]    = useState(false);
+  const [remoteScreenHidden, setRemoteScreenHidden] = useState(false);
   const [shareWithAudio,     setShareWithAudio]     = useState(false);
   const [screenPickerTab,    setScreenPickerTab]     = useState<"screen" | "app">("screen");
   const [participantVolumes, setParticipantVolumes]  = useState<Record<number, number>>({});
@@ -261,6 +262,7 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
     setIsScreenSharing(false);
     setRemoteScreenStream(null);
     setRemoteScreenFrom(null);
+    setRemoteScreenHidden(false);
 
     if (localStream.current) {
       localStream.current.getTracks().forEach((t) => t.stop());
@@ -535,6 +537,7 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
       } else if (type === "rtc_screen_stop") {
         setRemoteScreenStream(null);
         setRemoteScreenFrom(null);
+        setRemoteScreenHidden(false);
       } else if (type === "rtc_hang_up" || type === "rtc_group_hang_up") {
         // Dismiss incoming call modal if the caller cancelled before we answered
         stopRingtone();
@@ -667,6 +670,22 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
                 style={{ height: 32, width: 32, color: isScreenSharing ? "var(--color-primary)" : "var(--text-secondary)" }}
               >
                 {isScreenSharing ? <MonitorOff size={14} /> : <Monitor size={14} />}
+              </button>
+            )}
+            {/* Re-open button when the overlay was hidden but stream is still active */}
+            {remoteScreenStream && remoteScreenHidden && (
+              <button
+                className="btn btn-ghost btn-icon"
+                title={`${remoteScreenFrom} — ${t.callMaximize}`}
+                onClick={() => setRemoteScreenHidden(false)}
+                style={{ height: 32, width: 32, color: "var(--color-primary)", position: "relative" }}
+              >
+                <Monitor size={14} />
+                <span style={{
+                  position: "absolute", top: 4, right: 4,
+                  width: 6, height: 6, borderRadius: "50%",
+                  background: "var(--color-primary)",
+                }} />
               </button>
             )}
             <button
@@ -804,7 +823,7 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
       )}
 
       {/* ── Remote screen share overlay ────────────────────────────── */}
-      {remoteScreenStream && (
+      {remoteScreenStream && !remoteScreenHidden && (
         <motion.div
           key="remote-screen"
           initial={{ opacity: 0, scale: 0.96 }}
@@ -862,7 +881,7 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
                 className="btn btn-ghost btn-icon"
                 style={{ height: 24, width: 24, color: "#fff" }}
                 title={t.callHideView}
-                onClick={() => { setRemoteScreenStream(null); setRemoteScreenFrom(null); }}
+                onClick={() => setRemoteScreenHidden(true)}
               >
                 <X size={12} />
               </button>
