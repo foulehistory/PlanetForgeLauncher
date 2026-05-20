@@ -5,7 +5,7 @@ import { autoUpdater } from "electron-updater";
 // Server URL: localhost in dev, public IP when packaged for distribution
 const API_BASE = app.isPackaged
   ? "http://176.157.240.57:8000"
-  : "http://localhost:8000";
+  : "http://localhost:8000"; // maybe remove
 
 // Auto-updater setup
 
