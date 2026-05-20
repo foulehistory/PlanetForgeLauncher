@@ -102,7 +102,11 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
   // ─── Ringtone helpers ───────────────────────────────────────────────────────
   const playRingtone = useCallback(() => {
     if (ringtoneEl.current) return; // already playing
-    const el = new Audio("/sonnerie.mp3");
+    // Use a URL relative to the current page so it works in both dev (http://)
+    // and the packaged Electron app (file://). An absolute path like "/sonnerie.mp3"
+    // resolves to the filesystem root under file:// and breaks in the packaged build.
+    const ringtoneUrl = new URL("sonnerie.mp3", window.location.href).href;
+    const el = new Audio(ringtoneUrl);
     el.loop = true;
     el.volume = 0.6;
     el.play().catch(() => { /* autoplay blocked, ignore */ });
