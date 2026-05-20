@@ -339,6 +339,9 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
           } catch { /* ignore late candidates */ }
         }
       } else if (type === "rtc_hang_up" || type === "rtc_group_hang_up") {
+        // Dismiss incoming call modal if the caller cancelled before we answered
+        stopRingtone();
+        setIncomingCall(null);
         hangUpAll(false);
       }
     };

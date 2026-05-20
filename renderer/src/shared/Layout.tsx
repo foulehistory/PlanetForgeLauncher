@@ -50,7 +50,7 @@ export default function Layout() {
 
   const nativeNotif = (title: string, body: string) => {
     if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
-    if (!document.hidden) return; // app is visible — use in-app toasts
+    if (document.hasFocus()) return; // app is focused — use in-app toasts
     new Notification(title, { body, icon: "/icon.png", silent: false });
   };
 
