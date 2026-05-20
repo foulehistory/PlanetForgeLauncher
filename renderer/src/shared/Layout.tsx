@@ -41,6 +41,19 @@ export default function Layout() {
   const wsRef = useRef<WebSocket | null>(null);
   const myId  = getMyUserId();
 
+  // ── Native OS notifications (shown when app is not focused) ─────────────
+  useEffect(() => {
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  const nativeNotif = (title: string, body: string) => {
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    if (!document.hidden) return; // app is visible — use in-app toasts
+    new Notification(title, { body, icon: "/icon.png", silent: false });
+  };
+
   // Track known request IDs to avoid duplicate notifications
   const knownRequestIds = useRef<Set<number>>(new Set());
   // Stable ref so polling closure always uses latest t (updated after every render)
@@ -93,12 +106,9 @@ export default function Layout() {
                 offlineTimers.current.delete(uid);
               } else if (!onlineIdsRef.current.has(uid)) {
                 // Genuine offline → online transition: show notification
-                addNotification({
-                  type: "info",
-                  title: tRef.current.friendsOnline,
-                  message: (msg.display_name as string | null) || (msg.username as string),
-                  duration: 5000,
-                });
+                const uname = (msg.display_name as string | null) || (msg.username as string);
+                addNotification({ type: "info", title: tRef.current.friendsOnline, message: uname, duration: 5000 });
+                nativeNotif("PlanetForge", `${uname} est maintenant en ligne.`);
               }
               setOnlineUserIds((prev) => { const next = new Set(prev); next.add(uid); return next; });
             } else {
@@ -115,6 +125,7 @@ export default function Layout() {
             if (knownRequestIds.current.has(fid)) return;
             knownRequestIds.current.add(fid);
             const name = (msg.display_name as string | null) || (msg.username as string);
+            nativeNotif("Demande d'ami — PlanetForge", `${name} vous a envoyé une demande d'ami.`);
             addNotification({
               type:     "info",
               title:    tRef.current.friendsTabRequests,
@@ -153,10 +164,12 @@ export default function Layout() {
           } else if (msg.type === "new_message" || msg.type === "group_message") {
             if (!friendsPanelOpenRef.current) {
               setUnreadMsg((n) => n + 1);
-              const m = (msg.type === "new_message" ? msg.message : msg.message) as Record<string, unknown> | undefined;
+              const m = msg.message as Record<string, unknown> | undefined;
               if (m) {
                 const sender = (m.display_name as string | null) || (m.username as string) || "";
+                const content = String(m.content ?? "").slice(0, 80);
                 const prefix = msg.type === "group_message" ? "Groupe · " : "";
+                nativeNotif(`${prefix}${sender} — PlanetForge`, content || "Nouveau message");
                 addNotification({
                   type: "info",
                   title: tRef.current.friendsTabFriends,
@@ -169,6 +182,7 @@ export default function Layout() {
           } else if (msg.type === "achievement_unlocked") {
             const ach = msg.achievement as Record<string, unknown> | undefined;
             if (ach) {
+              nativeNotif(`${ach.icon ?? "🏆"} Succès débloqué ! — PlanetForge`, String(ach.title ?? ""));
               addNotification({
                 type:     "info",
                 title:    `${ach.icon ?? "🏆"} Succès débloqué !`,

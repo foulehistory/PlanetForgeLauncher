@@ -689,7 +689,7 @@ export default function FriendsPanel({ isOpen, onClose, reloadKey, onlineUserIds
                       {pendingCount > 0 && <span className="fp-badge fp-badge-warn">{pendingCount}</span>}
                     </button>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                     {/* Status dot — click to change own presence */}
                     <div style={{ position: "relative" }} ref={statusPickerRef}>
                       <button
