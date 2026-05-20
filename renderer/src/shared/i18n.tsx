@@ -113,6 +113,17 @@ type Dictionary = {
   friendsAccept: string;
   friendsDecline: string;
   friendsRemove: string;
+  // Voice call screen share & volume
+  callPickScreen: string;
+  callScreensTab: string;
+  callAppsTab: string;
+  callShareAudio: string;
+  callAudioVolume: string;
+  callSharingFrom: string;
+  callHideView: string;
+  callMinimize: string;
+  callMaximize: string;
+  callParticipants: string;
 };
 
 const dictionaries: Record<Language, Dictionary> = {
@@ -213,6 +224,16 @@ const dictionaries: Record<Language, Dictionary> = {
     friendsAccept: "Accepter",
     friendsDecline: "Refuser",
     friendsRemove: "Retirer",
+    callPickScreen: "Choisir quoi partager",
+    callScreensTab: "Écrans",
+    callAppsTab: "Applications",
+    callShareAudio: "Inclure le son du bureau",
+    callAudioVolume: "Volume audio",
+    callSharingFrom: "partage son écran",
+    callHideView: "Fermer la vue",
+    callMinimize: "Réduire",
+    callMaximize: "Agrandir",
+    callParticipants: "Participants",
   },
   en: {
     appName: "PlanetForge Launcher",
@@ -311,6 +332,16 @@ const dictionaries: Record<Language, Dictionary> = {
     friendsAccept: "Accept",
     friendsDecline: "Decline",
     friendsRemove: "Remove",
+    callPickScreen: "Choose what to share",
+    callScreensTab: "Screens",
+    callAppsTab: "Applications",
+    callShareAudio: "Include desktop audio",
+    callAudioVolume: "Audio volume",
+    callSharingFrom: "is sharing their screen",
+    callHideView: "Hide view",
+    callMinimize: "Minimize",
+    callMaximize: "Maximize",
+    callParticipants: "Participants",
   },
   es: {
     appName: "PlanetForge Launcher",
@@ -409,6 +440,16 @@ const dictionaries: Record<Language, Dictionary> = {
     friendsAccept: "Aceptar",
     friendsDecline: "Rechazar",
     friendsRemove: "Eliminar",
+    callPickScreen: "Elegir qué compartir",
+    callScreensTab: "Pantallas",
+    callAppsTab: "Aplicaciones",
+    callShareAudio: "Incluir sonido del escritorio",
+    callAudioVolume: "Volumen de audio",
+    callSharingFrom: "está compartiendo pantalla",
+    callHideView: "Cerrar vista",
+    callMinimize: "Minimizar",
+    callMaximize: "Maximizar",
+    callParticipants: "Participantes",
   },
   de: {
     appName: "PlanetForge Launcher",
@@ -507,6 +548,16 @@ const dictionaries: Record<Language, Dictionary> = {
     friendsAccept: "Annehmen",
     friendsDecline: "Ablehnen",
     friendsRemove: "Entfernen",
+    callPickScreen: "Bildschirminhalt wählen",
+    callScreensTab: "Bildschirme",
+    callAppsTab: "Anwendungen",
+    callShareAudio: "Desktop-Audio einschließen",
+    callAudioVolume: "Lautstärke",
+    callSharingFrom: "teilt seinen Bildschirm",
+    callHideView: "Ansicht schließen",
+    callMinimize: "Minimieren",
+    callMaximize: "Maximieren",
+    callParticipants: "Teilnehmer",
   },
 };
 

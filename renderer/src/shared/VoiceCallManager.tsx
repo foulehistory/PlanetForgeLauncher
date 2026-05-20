@@ -19,7 +19,8 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, PhoneOff, Phone, Headphones, HeadphoneOff, Monitor, MonitorOff, X } from "lucide-react";
+import { Mic, MicOff, PhoneOff, Phone, Headphones, HeadphoneOff, Monitor, MonitorOff, X, Volume2 } from "lucide-react";
+import { useI18n } from "./i18n";
 
 // ICE servers: Google STUN + free OpenRelay TURN (fallback when STUN alone can't pierce NAT)
 const ICE_CONFIG: RTCConfiguration = {
@@ -91,6 +92,7 @@ type ScreenElectronAPI = {
 };
 
 export default function VoiceCallManager({ wsRef, myId }: Props) {
+  const { t } = useI18n();
   const [incomingCall, setIncomingCall]   = useState<IncomingCall | null>(null);
   const [activeTarget, setActiveTarget]   = useState<CallTarget | null>(null);
   const [callStatus,   setCallStatus]     = useState<"calling" | "connected" | "idle">("idle");
@@ -103,6 +105,11 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
   const [remoteScreenStream, setRemoteScreenStream] = useState<MediaStream | null>(null);
   const [remoteScreenFrom,   setRemoteScreenFrom]   = useState<string | null>(null);
   const [screenMinimized,    setScreenMinimized]    = useState(false);
+  const [shareWithAudio,     setShareWithAudio]     = useState(false);
+  const [screenPickerTab,    setScreenPickerTab]     = useState<"screen" | "app">("screen");
+  const [participantVolumes, setParticipantVolumes]  = useState<Record<number, number>>({});
+  const [remoteVideoVolume,  setRemoteVideoVolume]   = useState(1);
+  const [peerList,           setPeerList]            = useState<Array<{ userId: number; name: string }>>([]);
 
   const peers          = useRef<Map<number, PeerState>>(new Map());
   const localStream     = useRef<MediaStream | null>(null);
@@ -123,8 +130,15 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
   useEffect(() => {
     if (!remoteVideoRef.current) return;
     remoteVideoRef.current.srcObject = remoteScreenStream;
-    if (remoteScreenStream) remoteVideoRef.current.play().catch(() => {});
-  }, [remoteScreenStream]);
+    if (remoteScreenStream) {
+      remoteVideoRef.current.volume = remoteVideoVolume;
+      remoteVideoRef.current.play().catch(() => {});
+    }
+  }, [remoteScreenStream]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Sync audio volume of the remote screen share video
+  useEffect(() => {
+    if (remoteVideoRef.current) remoteVideoRef.current.volume = remoteVideoVolume;
+  }, [remoteVideoVolume]);
 
   // ─── Ringtone helpers ───────────────────────────────────────────────────────
   const playRingtone = useCallback(() => {
@@ -184,11 +198,18 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
     localAudio.getTracks().forEach((t) => pc.addTrack(t, localAudio));
 
     // Play remote audio / reveal remote screen share when tracks arrive
+    // peerScreenShareStreamId tracks which stream contains the screen share video+audio
+    // so we don't accidentally route screen audio into the voice audioEl.
+    let peerScreenShareStreamId: string | null = null;
     pc.ontrack = (ev) => {
       if (ev.track.kind === "audio") {
+        // Skip: screen share audio lives in the same stream as the video track;
+        // the <video> element will play it automatically.
+        if (peerScreenShareStreamId && ev.streams[0]?.id === peerScreenShareStreamId) return;
         audioEl.srcObject = ev.streams[0];
         audioEl.play().catch(() => { /* autoplay policy — rare in Electron */ });
       } else if (ev.track.kind === "video") {
+        peerScreenShareStreamId = ev.streams[0]?.id ?? null;
         setRemoteScreenStream(ev.streams[0]);
         setRemoteScreenFrom(name);
         setScreenMinimized(false);
@@ -203,6 +224,7 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
     };
 
     peers.current.set(userId, { pc, userId, name, audioEl, muted: false });
+    setPeerList((prev) => [...prev.filter((p) => p.userId !== userId), { userId, name }]);
 
     if (isInitiator) {
       const offer = await pc.createOffer();
@@ -255,6 +277,8 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
     setDuration(0);
     setMuted(false);
     setDeafened(false);
+    setPeerList([]);
+    setParticipantVolumes({});
     stopRingtone();
     if (dmTimeoutRef.current)  { clearTimeout(dmTimeoutRef.current);  dmTimeoutRef.current  = null; }
     if (aloneTimerRef.current) { clearTimeout(aloneTimerRef.current); aloneTimerRef.current = null; }
@@ -375,7 +399,8 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const stream = await (navigator.mediaDevices as any).getUserMedia({
-        audio: false,
+        // Capture system/loopback audio when the user opted in
+        audio: shareWithAudio ? { mandatory: { chromeMediaSource: "desktop" } } : false,
         video: {
           mandatory: {
             chromeMediaSource: "desktop",
@@ -390,10 +415,15 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
       setIsScreenSharing(true);
       const videoTrack = stream.getVideoTracks()[0];
       videoTrack.onended = () => stopScreenShare();
+      const audioTrack = stream.getAudioTracks()[0]; // system audio (only present when shareWithAudio=true)
       for (const [userId, peer] of peers.current) {
-        const sender = peer.pc.addTrack(videoTrack, stream);
         const existing = screenSenders.current.get(userId) ?? [];
-        existing.push(sender);
+        const vSender = peer.pc.addTrack(videoTrack, stream);
+        existing.push(vSender);
+        if (audioTrack) {
+          const aSender = peer.pc.addTrack(audioTrack, stream);
+          existing.push(aSender);
+        }
         screenSenders.current.set(userId, existing);
         const offer = await peer.pc.createOffer();
         await peer.pc.setLocalDescription(offer);
@@ -402,7 +432,14 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
         }
       }
     } catch { /* user cancelled or permission denied */ }
-  }, [wsSend, stopScreenShare]);
+  }, [wsSend, stopScreenShare, shareWithAudio]);
+
+  // ─── Per-participant volume ──────────────────────────────────────────────
+  const setParticipantVolume = useCallback((userId: number, vol: number) => {
+    const peer = peers.current.get(userId);
+    if (peer) peer.audioEl.volume = Math.max(0, Math.min(1, vol));
+    setParticipantVolumes((prev) => ({ ...prev, [userId]: vol }));
+  }, []);
 
   // Play ringtone for the callee when an incoming call arrives
   useEffect(() => {
@@ -640,6 +677,28 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
               <PhoneOff size={13} /> Raccrocher
             </button>
           </div>
+          {/* ── Participants volume ──────────────────────────────────── */}
+          {callStatus === "connected" && peerList.length > 0 && (
+            <div style={{ marginTop: 10, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
+              <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
+                {t.callParticipants}
+              </div>
+              {peerList.map(({ userId, name }) => (
+                <div key={userId} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {name}
+                  </span>
+                  <Volume2 size={11} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
+                  <input
+                    type="range" min={0} max={1} step={0.05}
+                    value={participantVolumes[userId] ?? 1}
+                    onChange={(e) => setParticipantVolume(userId, parseFloat(e.target.value))}
+                    style={{ width: 68 }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </motion.div>
       )}
 
@@ -670,40 +729,75 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
               overflowY: "auto",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
               <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>
-                Choisir quoi partager
+                {t.callPickScreen}
               </span>
               <button className="btn btn-ghost btn-icon" style={{ height: 28, width: 28 }} onClick={() => setScreenPickerOpen(false)}>
                 <X size={14} />
               </button>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: 12 }}>
-              {screenSources.map((src) => (
+            {/* Category tabs */}
+            <div style={{ display: "flex", gap: 2, marginBottom: 14, borderBottom: "1px solid var(--border)", paddingBottom: 8 }}>
+              {(["screen", "app"] as const).map((tab) => (
                 <button
-                  key={src.id}
-                  onClick={() => startScreenShare(src.id)}
+                  key={tab}
+                  onClick={() => setScreenPickerTab(tab)}
                   style={{
-                    background: "var(--bg-elevated)",
-                    border: "2px solid var(--border)",
-                    borderRadius: 8, padding: 8, cursor: "pointer",
-                    textAlign: "center", transition: "border-color 0.15s",
+                    fontSize: 12, padding: "4px 14px", borderRadius: 6, border: "none", cursor: "pointer",
+                    background: screenPickerTab === tab ? "var(--color-primary)" : "transparent",
+                    color: screenPickerTab === tab ? "#fff" : "var(--text-secondary)",
+                    fontWeight: screenPickerTab === tab ? 600 : 400,
+                    transition: "background 0.15s, color 0.15s",
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--color-primary)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
                 >
-                  <img
-                    src={src.thumbnail} alt={src.name}
-                    style={{ width: "100%", height: 110, objectFit: "contain", borderRadius: 4, background: "#000" }}
-                  />
-                  <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 4, justifyContent: "center" }}>
-                    {src.appIcon && <img src={src.appIcon} alt="" style={{ width: 14, height: 14, flexShrink: 0 }} />}
-                    <span style={{ fontSize: 11, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 150 }}>
-                      {src.name}
-                    </span>
-                  </div>
+                  {tab === "screen" ? t.callScreensTab : t.callAppsTab}
                 </button>
               ))}
+            </div>
+            {/* Audio capture toggle */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, padding: "8px 12px", background: "var(--bg-elevated)", borderRadius: 8 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
+                <input
+                  type="checkbox"
+                  checked={shareWithAudio}
+                  onChange={(e) => setShareWithAudio(e.target.checked)}
+                  style={{ width: 14, height: 14, cursor: "pointer" }}
+                />
+                <Volume2 size={13} style={{ color: "var(--text-muted)" }} />
+                <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>{t.callShareAudio}</span>
+              </label>
+            </div>
+            {/* Thumbnails grid — filtered by active tab */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: 12 }}>
+              {screenSources
+                .filter((src) => screenPickerTab === "screen" ? src.id.startsWith("screen:") : !src.id.startsWith("screen:"))
+                .map((src) => (
+                  <button
+                    key={src.id}
+                    onClick={() => startScreenShare(src.id)}
+                    style={{
+                      background: "var(--bg-elevated)",
+                      border: "2px solid var(--border)",
+                      borderRadius: 8, padding: 8, cursor: "pointer",
+                      textAlign: "center", transition: "border-color 0.15s",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--color-primary)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
+                  >
+                    <img
+                      src={src.thumbnail} alt={src.name}
+                      style={{ width: "100%", height: 110, objectFit: "contain", borderRadius: 4, background: "#000" }}
+                    />
+                    <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 4, justifyContent: "center" }}>
+                      {src.appIcon && <img src={src.appIcon} alt="" style={{ width: 14, height: 14, flexShrink: 0 }} />}
+                      <span style={{ fontSize: 11, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 150 }}>
+                        {src.name}
+                      </span>
+                    </div>
+                  </button>
+                ))}
             </div>
           </motion.div>
         </motion.div>
@@ -740,16 +834,26 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
             position: "absolute", top: 0, left: 0, right: 0,
             padding: "6px 10px",
             background: "linear-gradient(to bottom, rgba(0,0,0,0.65), transparent)",
-            display: "flex", alignItems: "center", justifyContent: "space-between",
+            display: "flex", alignItems: "center", gap: 8,
           }}>
-            <span style={{ fontSize: 11, color: "#fff", opacity: 0.9 }}>
-              🖥️ {remoteScreenFrom} partage son écran
+            <span style={{ fontSize: 11, color: "#fff", opacity: 0.9, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              🖥️ {remoteScreenFrom} {t.callSharingFrom}
             </span>
-            <div style={{ display: "flex", gap: 4 }}>
+            {/* Audio volume for screen share */}
+            <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }} title={t.callAudioVolume}>
+              <Volume2 size={11} style={{ color: "#fff", opacity: 0.7 }} />
+              <input
+                type="range" min={0} max={1} step={0.05}
+                value={remoteVideoVolume}
+                onChange={(e) => setRemoteVideoVolume(parseFloat(e.target.value))}
+                style={{ width: 64 }}
+              />
+            </div>
+            <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
               <button
                 className="btn btn-ghost btn-icon"
                 style={{ height: 24, width: 24, color: "#fff" }}
-                title={screenMinimized ? "Agrandir" : "Réduire"}
+                title={screenMinimized ? t.callMaximize : t.callMinimize}
                 onClick={() => setScreenMinimized((m) => !m)}
               >
                 {screenMinimized ? <Monitor size={12} /> : <MonitorOff size={12} />}
@@ -757,7 +861,7 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
               <button
                 className="btn btn-ghost btn-icon"
                 style={{ height: 24, width: 24, color: "#fff" }}
-                title="Fermer la vue (le partage continue)"
+                title={t.callHideView}
                 onClick={() => { setRemoteScreenStream(null); setRemoteScreenFrom(null); }}
               >
                 <X size={12} />
