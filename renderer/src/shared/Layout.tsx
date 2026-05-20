@@ -7,11 +7,21 @@ import { languageNames, languageOptions, type Language, useI18n } from "./i18n";
 import { NotificationManager } from "./NotificationManager";
 import { useNotification, useNotificationHelpers } from "./Notifications";
 import FriendsPanel from "./FriendsPanel";
+import VoiceCallManager from "./VoiceCallManager";
 import { API_BASE, WS_BASE } from "../config";
 
 function getToken(): string | null {
   const rememberMe = localStorage.getItem("remember-me") === "true";
   return (rememberMe ? localStorage : sessionStorage).getItem("auth-token");
+}
+
+function getMyUserId(): number | null {
+  const token = getToken();
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return parseInt(payload.user_id);
+  } catch { return null; }
 }
 
 
@@ -28,6 +38,8 @@ export default function Layout() {
   const [unreadMsg, setUnreadMsg] = useState(0);
   const friendsPanelOpenRef = useRef(false);
   useEffect(() => { friendsPanelOpenRef.current = friendsPanelOpen; }, [friendsPanelOpen]);
+  const wsRef = useRef<WebSocket | null>(null);
+  const myId  = getMyUserId();
 
   // Track known request IDs to avoid duplicate notifications
   const knownRequestIds = useRef<Set<number>>(new Set());
@@ -54,6 +66,7 @@ export default function Layout() {
       if (!token || !alive) return;
 
       ws = new WebSocket(`${WS_BASE}/api/ws?token=${encodeURIComponent(token)}`);
+      wsRef.current = ws;
 
       ws.onopen = () => {
         ping = setInterval(() => {
@@ -137,16 +150,17 @@ export default function Layout() {
               ],
             });
 
-          } else if (msg.type === "new_message") {
+          } else if (msg.type === "new_message" || msg.type === "group_message") {
             if (!friendsPanelOpenRef.current) {
               setUnreadMsg((n) => n + 1);
-              const m = msg.message as Record<string, unknown> | undefined;
+              const m = (msg.type === "new_message" ? msg.message : msg.message) as Record<string, unknown> | undefined;
               if (m) {
                 const sender = (m.display_name as string | null) || (m.username as string) || "";
+                const prefix = msg.type === "group_message" ? "Groupe · " : "";
                 addNotification({
                   type: "info",
                   title: tRef.current.friendsTabFriends,
-                  message: sender,
+                  message: prefix + sender,
                   duration: 4000,
                 });
               }
@@ -362,6 +376,8 @@ export default function Layout() {
       <NotificationManager />
 
       <FriendsPanel isOpen={friendsPanelOpen} onClose={() => setFriendsPanelOpen(false)} reloadKey={friendsReloadKey} onlineUserIds={onlineUserIds} />
+
+      <VoiceCallManager wsRef={wsRef} myId={myId} />
 
     </div>
   );
