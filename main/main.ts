@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, Notification, desktopCapturer, screen as electronScreen } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, Notification, desktopCapturer, screen as electronScreen, Tray, nativeImage } from "electron";
 import path from "path";
 import { autoUpdater } from "electron-updater";
 
@@ -28,6 +28,8 @@ function isNoPublishedReleaseError(error: unknown): boolean {
 
 let mainWin: BrowserWindow | null = null;
 let overlayWin: BrowserWindow | null = null;
+let tray: Tray | null = null;
+let minimizeToTray = true;
 
 const iconPath = () => {
   if (process.platform === "win32")   return path.join(__dirname, "../renderer/public/icon.ico");
@@ -51,6 +53,20 @@ function createWindow() {
   });
 
   mainWin.once("ready-to-show", () => mainWin?.show());
+
+  // Minimize to tray instead of closing (if enabled)
+  mainWin.on("close", (e) => {
+    if (minimizeToTray) {
+      e.preventDefault();
+      mainWin?.hide();
+    }
+  });
+  // When actually closed (minimize_to_tray off), quit cleanly
+  mainWin.on("closed", () => {
+    overlayWin?.destroy();
+    overlayWin = null;
+    app.quit();
+  });
 
   if (app.isPackaged) {
     mainWin.loadFile(path.join(process.resourcesPath, "app/renderer/dist/index.html"));
@@ -97,7 +113,20 @@ app.whenReady().then(() => {
     createWindow();
     createOverlayWindow();
     Menu.setApplicationMenu(null);
+    createTray();
 });
+
+function createTray() {
+  const img = nativeImage.createFromPath(iconPath());
+  tray = new Tray(img);
+  tray.setToolTip("PlanetForge Launcher");
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: "Ouvrir PlanetForge", click: () => { mainWin?.show(); mainWin?.focus(); } },
+    { type: "separator" },
+    { label: "Quitter",            click: () => { minimizeToTray = false; app.quit(); } },
+  ]));
+  tray.on("double-click", () => { mainWin?.show(); mainWin?.focus(); });
+}
 
 // ── Native OS notification ────────────────────────────────────────────────────────
 ipcMain.on("notify:show", (_event, data: { title: string; body: string }) => {
@@ -194,6 +223,19 @@ ipcMain.on("overlay:accept-request-fwd", (_e, data) => {
 });
 ipcMain.on("overlay:decline-request-fwd", (_e, data) => {
   mainWin?.webContents.send("overlay:decline-request", data);
+});
+
+// ── Launcher settings ──────────────────────────────────────────────────────
+ipcMain.on("app:set-auto-launch", (_e, enabled: boolean) => {
+  app.setLoginItemSettings({ openAtLogin: enabled });
+});
+
+ipcMain.on("app:set-minimize-to-tray", (_e, enabled: boolean) => {
+  minimizeToTray = enabled;
+});
+
+ipcMain.on("app:set-auto-update", (_e, enabled: boolean) => {
+  autoUpdater.autoDownload = enabled;
 });
 
 ipcMain.handle("auth:login", async (_event, data: { email: string; password: string }) => {

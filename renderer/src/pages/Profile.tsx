@@ -1,4 +1,4 @@
-import { Gamepad2, Clock, Calendar, Pencil, Check, X, Trophy, Copy, Users, Camera, Bell, Eye, Volume2, UserPlus } from "lucide-react";
+import { Gamepad2, Clock, Calendar, Pencil, Check, X, Trophy, Copy, Users, Camera, Bell, Eye, Volume2, UserPlus, Monitor } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -32,20 +32,28 @@ interface Achievement {
 
 interface UserSettings {
   notifications: {
-    friend_request:  boolean;
-    friend_online:   boolean;
-    new_message:     boolean;
-    sound_enabled:   boolean;
+    friend_request:      boolean;
+    friend_online:       boolean;
+    new_message:         boolean;
+    sound_enabled:       boolean;
+    achievement_overlay: boolean;
   };
   privacy: {
     show_online_status:    boolean;
     allow_friend_requests: boolean;
+    show_game_activity:    boolean;
+  };
+  launcher: {
+    start_with_windows: boolean;
+    minimize_to_tray:   boolean;
+    auto_update:        boolean;
   };
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
-  notifications: { friend_request: true, friend_online: true, new_message: true, sound_enabled: true },
-  privacy:       { show_online_status: true, allow_friend_requests: true },
+  notifications: { friend_request: true, friend_online: true, new_message: true, sound_enabled: true, achievement_overlay: true },
+  privacy:       { show_online_status: true, allow_friend_requests: true, show_game_activity: true },
+  launcher:      { start_with_windows: false, minimize_to_tray: true, auto_update: true },
 };
 
 function getToken(): string | null {
@@ -109,7 +117,13 @@ export default function Profile() {
         const data: ProfileData = await res.json();
         setProfile(data);
         setDisplayName(data.display_name ?? "");
-        setSettings(data.settings ?? DEFAULT_SETTINGS);
+        const s = data.settings ?? DEFAULT_SETTINGS;
+        setSettings(s);
+        // Sync launcher settings to main process on load
+        type SyncAPI = { setMinimizeToTray?: (v: boolean) => void; setAutoUpdate?: (v: boolean) => void };
+        const syncApi = (window as Window & { api?: SyncAPI }).api;
+        syncApi?.setMinimizeToTray?.(s.launcher?.minimize_to_tray ?? true);
+        syncApi?.setAutoUpdate?.(s.launcher?.auto_update ?? true);
         if (achRes.ok) {
           const achData = await achRes.json();
           setAchievements(achData.all ?? []);
@@ -185,6 +199,12 @@ export default function Profile() {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify(settings),
       });
+      // Apply launcher settings via IPC
+      type LauncherAPI = { setAutoLaunch?: (v: boolean) => void; setMinimizeToTray?: (v: boolean) => void; setAutoUpdate?: (v: boolean) => void };
+      const appApi = (window as Window & { api?: LauncherAPI }).api;
+      appApi?.setAutoLaunch?.(settings.launcher.start_with_windows);
+      appApi?.setMinimizeToTray?.(settings.launcher.minimize_to_tray);
+      appApi?.setAutoUpdate?.(settings.launcher.auto_update);
     } finally {
       setSettingsSaving(false);
     }
@@ -195,6 +215,9 @@ export default function Profile() {
 
   const setPrivacy = (key: keyof UserSettings["privacy"], value: boolean) =>
     setSettings((s) => ({ ...s, privacy: { ...s.privacy, [key]: value } }));
+
+  const setLauncher = (key: keyof UserSettings["launcher"], value: boolean) =>
+    setSettings((s) => ({ ...s, launcher: { ...s.launcher, [key]: value } }));
 
   if (loading) {
     return (
@@ -408,14 +431,14 @@ export default function Profile() {
       {tab === "settings" && (
       <div className="card" style={{ padding: "20px 24px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>Paramètres</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{t.settingsTitle}</span>
           <button
             className="btn btn-primary"
             onClick={handleSaveSettings}
             disabled={settingsSaving}
             style={{ height: 28, fontSize: 11, padding: "0 12px" }}
           >
-            {settingsSaving ? "..." : <><Check size={11} /> Sauvegarder</>}
+            {settingsSaving ? "..." : <><Check size={11} /> {t.settingsSave}</>}
           </button>
         </div>
 
@@ -423,22 +446,35 @@ export default function Profile() {
         <div style={{ marginBottom: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
             <Bell size={12} style={{ color: "var(--accent)" }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Notifications</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{t.settingsNotifSection}</span>
           </div>
-          <SettingRow label="Demandes d'amis"   desc="Recevoir une notification lors d'une nouvelle demande"  checked={settings.notifications.friend_request} onChange={(v) => setNotif("friend_request", v)} />
-          <SettingRow label="Amis en ligne"     desc="Notifier quand un ami se connecte"                      checked={settings.notifications.friend_online}  onChange={(v) => setNotif("friend_online",  v)} />
-          <SettingRow label="Nouveaux messages" desc="Notifier lors d'un message reçu"                        checked={settings.notifications.new_message}    onChange={(v) => setNotif("new_message",    v)} />
-          <SettingRow label="Sons"              desc="Activer les sons de notifications"                      checked={settings.notifications.sound_enabled}  onChange={(v) => setNotif("sound_enabled",  v)} icon={<Volume2 size={12} />} last />
+          <SettingRow label={t.settingsFriendRequest}        desc={t.settingsFriendRequestDesc}        checked={settings.notifications.friend_request}      onChange={(v) => setNotif("friend_request",      v)} />
+          <SettingRow label={t.settingsFriendOnline}         desc={t.settingsFriendOnlineDesc}         checked={settings.notifications.friend_online}       onChange={(v) => setNotif("friend_online",       v)} />
+          <SettingRow label={t.settingsNewMessages}          desc={t.settingsNewMessagesDesc}          checked={settings.notifications.new_message}         onChange={(v) => setNotif("new_message",         v)} />
+          <SettingRow label={t.settingsSounds}               desc={t.settingsSoundsDesc}               checked={settings.notifications.sound_enabled}       onChange={(v) => setNotif("sound_enabled",       v)} icon={<Volume2 size={12} />} />
+          <SettingRow label={t.settingsAchievementOverlay}   desc={t.settingsAchievementOverlayDesc}   checked={settings.notifications.achievement_overlay} onChange={(v) => setNotif("achievement_overlay", v)} icon={<Trophy size={12} />} last />
         </div>
 
         {/* Confidentialité */}
-        <div>
+        <div style={{ marginBottom: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
             <Eye size={12} style={{ color: "var(--accent)" }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Confidentialité</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{t.settingsPrivacySection}</span>
           </div>
-          <SettingRow label="Statut en ligne"      desc="Montrer aux amis quand vous êtes connecté"                  checked={settings.privacy.show_online_status}    onChange={(v) => setPrivacy("show_online_status",    v)} />
-          <SettingRow label="Demandes d'amis"      desc="Autoriser les inconnus à vous envoyer une demande d'ami"    checked={settings.privacy.allow_friend_requests} onChange={(v) => setPrivacy("allow_friend_requests", v)} icon={<UserPlus size={12} />} last />
+          <SettingRow label={t.settingsOnlineStatus}   desc={t.settingsOnlineStatusDesc}   checked={settings.privacy.show_online_status}    onChange={(v) => setPrivacy("show_online_status",    v)} />
+          <SettingRow label={t.settingsAllowFriendReqs} desc={t.settingsAllowFriendReqsDesc} checked={settings.privacy.allow_friend_requests} onChange={(v) => setPrivacy("allow_friend_requests", v)} icon={<UserPlus size={12} />} />
+          <SettingRow label={t.settingsGameActivity}    desc={t.settingsGameActivityDesc}    checked={settings.privacy.show_game_activity}    onChange={(v) => setPrivacy("show_game_activity",    v)} icon={<Gamepad2 size={12} />} last />
+        </div>
+
+        {/* Launcher */}
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+            <Monitor size={12} style={{ color: "var(--accent)" }} />
+            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{t.settingsLauncherSection}</span>
+          </div>
+          <SettingRow label={t.settingsStartWithWindows} desc={t.settingsStartWithWindowsDesc} checked={settings.launcher.start_with_windows} onChange={(v) => setLauncher("start_with_windows", v)} />
+          <SettingRow label={t.settingsMinimizeToTray}   desc={t.settingsMinimizeToTrayDesc}   checked={settings.launcher.minimize_to_tray}   onChange={(v) => setLauncher("minimize_to_tray",   v)} />
+          <SettingRow label={t.settingsAutoUpdate}       desc={t.settingsAutoUpdateDesc}       checked={settings.launcher.auto_update}        onChange={(v) => setLauncher("auto_update",        v)} last />
         </div>
       </div>
       )}
@@ -450,7 +486,7 @@ export default function Profile() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Trophy size={14} style={{ color: "var(--accent)" }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>Succès</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{t.achievementsSection}</span>
             </div>
             <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
               {achEarnedCount} / {achievements.length}

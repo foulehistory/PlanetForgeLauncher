@@ -131,6 +131,34 @@ type Dictionary = {
   profileTabSettings: string;
   achievementUnlocked: string;
   overlayFriendRequest: string;
+  settingsTitle: string;
+  settingsSave: string;
+  settingsNotifSection: string;
+  settingsFriendRequest: string;
+  settingsFriendRequestDesc: string;
+  settingsFriendOnline: string;
+  settingsFriendOnlineDesc: string;
+  settingsNewMessages: string;
+  settingsNewMessagesDesc: string;
+  settingsSounds: string;
+  settingsSoundsDesc: string;
+  settingsAchievementOverlay: string;
+  settingsAchievementOverlayDesc: string;
+  settingsPrivacySection: string;
+  settingsOnlineStatus: string;
+  settingsOnlineStatusDesc: string;
+  settingsAllowFriendReqs: string;
+  settingsAllowFriendReqsDesc: string;
+  settingsGameActivity: string;
+  settingsGameActivityDesc: string;
+  settingsLauncherSection: string;
+  settingsStartWithWindows: string;
+  settingsStartWithWindowsDesc: string;
+  settingsMinimizeToTray: string;
+  settingsMinimizeToTrayDesc: string;
+  settingsAutoUpdate: string;
+  settingsAutoUpdateDesc: string;
+  achievementsSection: string;
 };
 
 const dictionaries: Record<Language, Dictionary> = {
@@ -248,6 +276,34 @@ const dictionaries: Record<Language, Dictionary> = {
     profileTabSettings: "Paramètres",
     achievementUnlocked: "Succès débloqué !",
     overlayFriendRequest: "Demande d'ami",
+    settingsTitle: "Paramètres",
+    settingsSave: "Sauvegarder",
+    settingsNotifSection: "Notifications",
+    settingsFriendRequest: "Demandes d'amis",
+    settingsFriendRequestDesc: "Recevoir une notification lors d'une nouvelle demande",
+    settingsFriendOnline: "Amis en ligne",
+    settingsFriendOnlineDesc: "Notifier quand un ami se connecte",
+    settingsNewMessages: "Nouveaux messages",
+    settingsNewMessagesDesc: "Notifier lors d'un message reçu",
+    settingsSounds: "Sons",
+    settingsSoundsDesc: "Activer les sons de notifications",
+    settingsAchievementOverlay: "Succès dans l'overlay",
+    settingsAchievementOverlayDesc: "Afficher les succès débloqués dans l'overlay de jeu",
+    settingsPrivacySection: "Confidentialité",
+    settingsOnlineStatus: "Statut en ligne",
+    settingsOnlineStatusDesc: "Montrer aux amis quand vous êtes connecté",
+    settingsAllowFriendReqs: "Demandes d'amis",
+    settingsAllowFriendReqsDesc: "Autoriser les inconnus à vous envoyer une demande d'ami",
+    settingsGameActivity: "Activité de jeu",
+    settingsGameActivityDesc: "Afficher le jeu en cours à vos amis",
+    settingsLauncherSection: "Launcher",
+    settingsStartWithWindows: "Démarrer avec Windows",
+    settingsStartWithWindowsDesc: "Lancer PlanetForge au démarrage de Windows",
+    settingsMinimizeToTray: "Réduire dans la barre système",
+    settingsMinimizeToTrayDesc: "Réduire dans la barre système à la fermeture",
+    settingsAutoUpdate: "Mises à jour automatiques",
+    settingsAutoUpdateDesc: "Télécharger et installer les mises à jour automatiquement",
+    achievementsSection: "Succès",
   },
   en: {
     appName: "PlanetForge Launcher",
@@ -363,6 +419,34 @@ const dictionaries: Record<Language, Dictionary> = {
     profileTabSettings: "Settings",
     achievementUnlocked: "Achievement unlocked!",
     overlayFriendRequest: "Friend request",
+    settingsTitle: "Settings",
+    settingsSave: "Save",
+    settingsNotifSection: "Notifications",
+    settingsFriendRequest: "Friend requests",
+    settingsFriendRequestDesc: "Get notified for new friend requests",
+    settingsFriendOnline: "Friends online",
+    settingsFriendOnlineDesc: "Notify when a friend comes online",
+    settingsNewMessages: "New messages",
+    settingsNewMessagesDesc: "Notify on new message",
+    settingsSounds: "Sounds",
+    settingsSoundsDesc: "Enable notification sounds",
+    settingsAchievementOverlay: "Achievements in overlay",
+    settingsAchievementOverlayDesc: "Show unlocked achievements in the game overlay",
+    settingsPrivacySection: "Privacy",
+    settingsOnlineStatus: "Online status",
+    settingsOnlineStatusDesc: "Show friends when you're online",
+    settingsAllowFriendReqs: "Friend requests",
+    settingsAllowFriendReqsDesc: "Allow strangers to send you friend requests",
+    settingsGameActivity: "Game activity",
+    settingsGameActivityDesc: "Show your current game to friends",
+    settingsLauncherSection: "Launcher",
+    settingsStartWithWindows: "Launch at startup",
+    settingsStartWithWindowsDesc: "Launch PlanetForge when Windows starts",
+    settingsMinimizeToTray: "Minimize to tray",
+    settingsMinimizeToTrayDesc: "Minimize to system tray on close",
+    settingsAutoUpdate: "Automatic updates",
+    settingsAutoUpdateDesc: "Download and install updates automatically",
+    achievementsSection: "Achievements",
   },
   es: {
     appName: "PlanetForge Launcher",
@@ -478,6 +562,34 @@ const dictionaries: Record<Language, Dictionary> = {
     profileTabSettings: "Ajustes",
     achievementUnlocked: "¡Logro desbloqueado!",
     overlayFriendRequest: "Solicitud de amistad",
+    settingsTitle: "Ajustes",
+    settingsSave: "Guardar",
+    settingsNotifSection: "Notificaciones",
+    settingsFriendRequest: "Solicitudes de amigos",
+    settingsFriendRequestDesc: "Recibir notificación de nuevas solicitudes",
+    settingsFriendOnline: "Amigos en línea",
+    settingsFriendOnlineDesc: "Notificar cuando un amigo se conecta",
+    settingsNewMessages: "Nuevos mensajes",
+    settingsNewMessagesDesc: "Notificar al recibir un mensaje",
+    settingsSounds: "Sonidos",
+    settingsSoundsDesc: "Activar sonidos de notificaciones",
+    settingsAchievementOverlay: "Logros en overlay",
+    settingsAchievementOverlayDesc: "Mostrar logros desbloqueados en el overlay",
+    settingsPrivacySection: "Privacidad",
+    settingsOnlineStatus: "Estado en línea",
+    settingsOnlineStatusDesc: "Mostrar a amigos cuando estás conectado",
+    settingsAllowFriendReqs: "Solicitudes de amigos",
+    settingsAllowFriendReqsDesc: "Permitir que extraños envíen solicitudes de amistad",
+    settingsGameActivity: "Actividad de juego",
+    settingsGameActivityDesc: "Mostrar el juego actual a tus amigos",
+    settingsLauncherSection: "Launcher",
+    settingsStartWithWindows: "Iniciar con Windows",
+    settingsStartWithWindowsDesc: "Lanzar PlanetForge al iniciar Windows",
+    settingsMinimizeToTray: "Minimizar a la bandeja",
+    settingsMinimizeToTrayDesc: "Minimizar a la bandeja del sistema al cerrar",
+    settingsAutoUpdate: "Actualizaciones automáticas",
+    settingsAutoUpdateDesc: "Descargar e instalar actualizaciones automáticamente",
+    achievementsSection: "Logros",
   },
   de: {
     appName: "PlanetForge Launcher",
@@ -593,6 +705,34 @@ const dictionaries: Record<Language, Dictionary> = {
     profileTabSettings: "Einstellungen",
     achievementUnlocked: "Erfolg freigeschaltet!",
     overlayFriendRequest: "Freundschaftsanfrage",
+    settingsTitle: "Einstellungen",
+    settingsSave: "Speichern",
+    settingsNotifSection: "Benachrichtigungen",
+    settingsFriendRequest: "Freundschaftsanfragen",
+    settingsFriendRequestDesc: "Bei neuen Freundschaftsanfragen benachrichtigen",
+    settingsFriendOnline: "Freunde online",
+    settingsFriendOnlineDesc: "Benachrichtigen wenn ein Freund online geht",
+    settingsNewMessages: "Neue Nachrichten",
+    settingsNewMessagesDesc: "Bei neuer Nachricht benachrichtigen",
+    settingsSounds: "Töne",
+    settingsSoundsDesc: "Benachrichtigungstöne aktivieren",
+    settingsAchievementOverlay: "Erfolge im Overlay",
+    settingsAchievementOverlayDesc: "Freigeschaltete Erfolge im Spiel-Overlay anzeigen",
+    settingsPrivacySection: "Datenschutz",
+    settingsOnlineStatus: "Online-Status",
+    settingsOnlineStatusDesc: "Freunden zeigen wenn du online bist",
+    settingsAllowFriendReqs: "Freundschaftsanfragen",
+    settingsAllowFriendReqsDesc: "Fremden erlauben Freundschaftsanfragen zu senden",
+    settingsGameActivity: "Spielaktivität",
+    settingsGameActivityDesc: "Aktuelles Spiel Freunden zeigen",
+    settingsLauncherSection: "Launcher",
+    settingsStartWithWindows: "Mit Windows starten",
+    settingsStartWithWindowsDesc: "PlanetForge beim Windows-Start starten",
+    settingsMinimizeToTray: "In Taskleiste minimieren",
+    settingsMinimizeToTrayDesc: "Beim Schließen in die Taskleiste minimieren",
+    settingsAutoUpdate: "Automatische Updates",
+    settingsAutoUpdateDesc: "Updates automatisch herunterladen und installieren",
+    achievementsSection: "Erfolge",
   },
 };
 

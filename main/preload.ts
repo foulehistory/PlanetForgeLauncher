@@ -64,4 +64,9 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("overlay:accept-request", (_e, d) => cb(d)),
   onOverlayDeclineRequest:    (cb: (data: unknown) => void) =>
     ipcRenderer.on("overlay:decline-request", (_e, d) => cb(d)),
+
+  // ── Launcher settings ─────────────────────────────────────────────────────
+  setAutoLaunch:      (v: boolean) => ipcRenderer.send("app:set-auto-launch", v),
+  setMinimizeToTray:  (v: boolean) => ipcRenderer.send("app:set-minimize-to-tray", v),
+  setAutoUpdate:      (v: boolean) => ipcRenderer.send("app:set-auto-update", v),
 });
