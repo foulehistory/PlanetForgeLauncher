@@ -34,4 +34,16 @@ contextBridge.exposeInMainWorld("api", {
 
   // Overlay controls its own click-through state
   overlaySetInteractive: (interactive: boolean) => ipcRenderer.send("overlay:set-interactive", interactive),
+
+  // ── Message overlay ──────────────────────────────────────────────────────
+  // Main window → overlay: show a message card with reply input
+  overlayShowMessage:    (data: unknown) => ipcRenderer.send("overlay:show-message", data),
+  // Overlay receives the forwarded message
+  onOverlayShowMessage:  (cb: (data: unknown) => void) =>
+    ipcRenderer.on("overlay:show-message-fwd", (_e, d) => cb(d)),
+  // Overlay → main window: user submitted a quick reply
+  overlayReplyMessage:   (data: unknown) => ipcRenderer.send("overlay:reply-message-fwd", data),
+  // Main window receives the reply to POST it via HTTP
+  onOverlayReplyMessage: (cb: (data: unknown) => void) =>
+    ipcRenderer.on("overlay:reply-message", (_e, d) => cb(d)),
 });

@@ -124,6 +124,9 @@ type Dictionary = {
   callMinimize: string;
   callMaximize: string;
   callParticipants: string;
+  friendPlaying: string;
+  overlayMsgReply: string;
+  overlaySend: string;
 };
 
 const dictionaries: Record<Language, Dictionary> = {
@@ -234,6 +237,9 @@ const dictionaries: Record<Language, Dictionary> = {
     callMinimize: "Réduire",
     callMaximize: "Agrandir",
     callParticipants: "Participants",
+    friendPlaying: "joue à",
+    overlayMsgReply: "Répondre...",
+    overlaySend: "Envoyer",
   },
   en: {
     appName: "PlanetForge Launcher",
@@ -342,6 +348,9 @@ const dictionaries: Record<Language, Dictionary> = {
     callMinimize: "Minimize",
     callMaximize: "Maximize",
     callParticipants: "Participants",
+    friendPlaying: "is playing",
+    overlayMsgReply: "Reply...",
+    overlaySend: "Send",
   },
   es: {
     appName: "PlanetForge Launcher",
@@ -450,6 +459,9 @@ const dictionaries: Record<Language, Dictionary> = {
     callMinimize: "Minimizar",
     callMaximize: "Maximizar",
     callParticipants: "Participantes",
+    friendPlaying: "está jugando a",
+    overlayMsgReply: "Responder...",
+    overlaySend: "Enviar",
   },
   de: {
     appName: "PlanetForge Launcher",
@@ -558,6 +570,9 @@ const dictionaries: Record<Language, Dictionary> = {
     callMinimize: "Minimieren",
     callMaximize: "Maximieren",
     callParticipants: "Teilnehmer",
+    friendPlaying: "spielt gerade",
+    overlayMsgReply: "Antworten...",
+    overlaySend: "Senden",
   },
 };
 

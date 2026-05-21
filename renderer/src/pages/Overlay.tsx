@@ -1,5 +1,5 @@
-import { useState, useEffect, useLayoutEffect } from "react";
-import { Phone, PhoneOff, X, CheckCircle, AlertCircle, Info, AlertTriangle } from "lucide-react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { Phone, PhoneOff, X, CheckCircle, AlertCircle, Info, AlertTriangle, MessageSquare, Send } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useI18n } from "../shared/i18n";
 
@@ -8,6 +8,14 @@ type OverlayCallData = {
   fromName: string;
   callType: "dm" | "group";
   groupId?: number;
+};
+
+type OverlayMessage = {
+  id: string;
+  friendshipId: number;
+  fromName: string;
+  content: string;
+  isGroup: boolean;
 };
 
 type OverlayNotif = {
@@ -23,8 +31,10 @@ type OverlayAPI = {
   onOverlayHideCall?:    (cb: () => void) => void;
   onOverlayShowNotif?:   (cb: (d: OverlayNotif) => void) => void;
   onOverlayRemoveNotif?: (cb: (id: string) => void) => void;
+  onOverlayShowMessage?: (cb: (d: OverlayMessage) => void) => void;
   overlayAcceptCall?:    () => void;
   overlayDeclineCall?:   () => void;
+  overlayReplyMessage?:  (data: { friendshipId: number; content: string }) => void;
   overlaySetInteractive?: (v: boolean) => void;
 };
 
@@ -44,8 +54,11 @@ const notifIcons = {
 
 export default function Overlay() {
   const { t } = useI18n();
-  const [call, setCall]     = useState<OverlayCallData | null>(null);
-  const [notifs, setNotifs] = useState<OverlayNotif[]>([]);
+  const [call, setCall]         = useState<OverlayCallData | null>(null);
+  const [notifs, setNotifs]     = useState<OverlayNotif[]>([]);
+  const [messages, setMessages] = useState<OverlayMessage[]>([]);
+  const replyTexts              = useRef<Record<string, string>>({});
+  const [, forceUpdate]         = useState(0);
 
   // Transparent background — must run before paint
   useLayoutEffect(() => {
@@ -73,13 +86,25 @@ export default function Overlay() {
     api.onOverlayRemoveNotif?.((id) =>
       setNotifs((prev) => prev.filter((n) => n.id !== id))
     );
+
+    api.onOverlayShowMessage?.((d) => {
+      setMessages((prev) => {
+        // deduplicate by id
+        if (prev.some((m) => m.id === d.id)) return prev;
+        return [...prev, d];
+      });
+      // auto-dismiss after 30 s if not replied
+      setTimeout(() =>
+        setMessages((prev) => prev.filter((m) => m.id !== d.id)), 30_000
+      );
+    });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Toggle click-through based on visible content
   useEffect(() => {
     const api = (window as Window & { api?: OverlayAPI }).api;
-    api?.overlaySetInteractive?.(call !== null || notifs.length > 0);
-  }, [call, notifs.length]);
+    api?.overlaySetInteractive?.(call !== null || notifs.length > 0 || messages.length > 0);
+  }, [call, notifs.length, messages.length]);
 
   const accept = () => {
     (window as Window & { api?: OverlayAPI }).api?.overlayAcceptCall?.();
@@ -94,87 +119,222 @@ export default function Overlay() {
   const dismissNotif = (id: string) =>
     setNotifs((prev) => prev.filter((n) => n.id !== id));
 
+  const dismissMessage = (id: string) => {
+    setMessages((prev) => prev.filter((m) => m.id !== id));
+    delete replyTexts.current[id];
+  };
+
+  const sendReply = (id: string, friendshipId: number) => {
+    const content = (replyTexts.current[id] ?? "").trim();
+    if (!content) return;
+    (window as Window & { api?: OverlayAPI }).api?.overlayReplyMessage?.({ friendshipId, content });
+    dismissMessage(id);
+  };
+
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 9999, pointerEvents: "none", background: "transparent" }}>
 
-      {/* ── Incoming call card — top right ─────────────────────────────── */}
-      <AnimatePresence>
-        {call && (
-          <motion.div
-            key="overlay-call"
-            initial={{ opacity: 0, x: 80, scale: 0.92 }}
-            animate={{ opacity: 1, x: 0,  scale: 1    }}
-            exit={{    opacity: 0, x: 80, scale: 0.92 }}
-            transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            style={{
-              position: "absolute",
-              top: 20,
-              right: 20,
-              background: "var(--bg-surface)",
-              border: "1px solid var(--color-success)",
-              borderRadius: 12,
-              padding: "16px 20px",
-              minWidth: 260,
-              maxWidth: 320,
-              boxShadow: "0 8px 40px rgba(0,0,0,0.75)",
-              pointerEvents: "auto",
-            }}
-          >
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-              <div style={{
-                width: 40, height: 40, borderRadius: "50%",
-                background: "var(--color-success)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                flexShrink: 0,
-                boxShadow: "0 0 0 6px rgba(62, 207, 142, 0.15)",
-              }}>
-                <Phone size={17} color="#fff" />
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 3 }}>
-                  {call.callType === "group" ? "Appel de groupe entrant" : "Appel entrant"}
-                </div>
-                <div style={{
-                  fontSize: 14, fontWeight: 700,
-                  color: "var(--text-primary)",
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                }}>
-                  {call.fromName}
-                </div>
-              </div>
-            </div>
+      {/* ── Incoming call + message cards — top right ──────────────────── */}
+      <div style={{
+        position: "absolute",
+        top: 20,
+        right: 20,
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+        maxWidth: 320,
+        pointerEvents: "none",
+      }}>
 
-            {/* Buttons */}
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                onClick={accept}
-                style={{
-                  flex: 1, height: 34, borderRadius: 8, border: "none",
-                  background: "var(--color-success)", color: "#fff",
-                  fontWeight: 600, fontSize: 12, cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                  fontFamily: "inherit",
-                }}
-              >
-                <Phone size={13} /> {t.friendsAccept}
-              </button>
-              <button
-                onClick={decline}
-                style={{
-                  flex: 1, height: 34, borderRadius: 8, border: "none",
-                  background: "var(--color-danger)", color: "#fff",
-                  fontWeight: 600, fontSize: 12, cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                  fontFamily: "inherit",
-                }}
-              >
-                <PhoneOff size={13} /> {t.friendsDecline}
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        {/* Incoming call card */}
+        <AnimatePresence>
+          {call && (
+            <motion.div
+              key="overlay-call"
+              initial={{ opacity: 0, x: 80, scale: 0.92 }}
+              animate={{ opacity: 1, x: 0,  scale: 1    }}
+              exit={{    opacity: 0, x: 80, scale: 0.92 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              style={{
+                background: "var(--bg-surface)",
+                border: "1px solid var(--color-success)",
+                borderRadius: 12,
+                padding: "16px 20px",
+                boxShadow: "0 8px 40px rgba(0,0,0,0.75)",
+                pointerEvents: "auto",
+              }}
+            >
+              {/* Header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: "50%",
+                  background: "var(--color-success)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  flexShrink: 0,
+                  boxShadow: "0 0 0 6px rgba(62, 207, 142, 0.15)",
+                }}>
+                  <Phone size={17} color="#fff" />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 3 }}>
+                    {call.callType === "group" ? "Appel de groupe entrant" : "Appel entrant"}
+                  </div>
+                  <div style={{
+                    fontSize: 14, fontWeight: 700,
+                    color: "var(--text-primary)",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {call.fromName}
+                  </div>
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={accept}
+                  style={{
+                    flex: 1, height: 34, borderRadius: 8, border: "none",
+                    background: "var(--color-success)", color: "#fff",
+                    fontWeight: 600, fontSize: 12, cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    fontFamily: "inherit",
+                  }}
+                >
+                  <Phone size={13} /> {t.friendsAccept}
+                </button>
+                <button
+                  onClick={decline}
+                  style={{
+                    flex: 1, height: 34, borderRadius: 8, border: "none",
+                    background: "var(--color-danger)", color: "#fff",
+                    fontWeight: 600, fontSize: 12, cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    fontFamily: "inherit",
+                  }}
+                >
+                  <PhoneOff size={13} /> {t.friendsDecline}
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Message cards with quick reply */}
+        <AnimatePresence mode="popLayout">
+          {messages.map((m) => (
+            <motion.div
+              key={m.id}
+              layout
+              initial={{ opacity: 0, x: 80, scale: 0.92 }}
+              animate={{ opacity: 1, x: 0,  scale: 1    }}
+              exit={{    opacity: 0, x: 80, scale: 0.92 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              style={{
+                background: "var(--bg-surface)",
+                border: "1px solid var(--accent)",
+                borderRadius: 12,
+                padding: "12px 14px",
+                boxShadow: "0 8px 40px rgba(0,0,0,0.75)",
+                pointerEvents: "auto",
+              }}
+            >
+              {/* Header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: "50%",
+                  background: "var(--accent)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  flexShrink: 0,
+                }}>
+                  <MessageSquare size={14} color="#fff" />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 1 }}>
+                    {m.isGroup ? "Message de groupe" : "Message"}
+                  </div>
+                  <div style={{
+                    fontSize: 13, fontWeight: 700,
+                    color: "var(--text-primary)",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {m.fromName}
+                  </div>
+                </div>
+                <button
+                  onClick={() => dismissMessage(m.id)}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    padding: 2, color: "var(--text-muted)", flexShrink: 0,
+                    display: "flex", alignItems: "center",
+                  }}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+
+              {/* Message preview */}
+              {m.content && (
+                <div style={{
+                  fontSize: 12, color: "var(--text-muted)",
+                  marginBottom: 10,
+                  overflow: "hidden",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  lineHeight: 1.4,
+                }}>
+                  {m.content}
+                </div>
+              )}
+
+              {/* Reply input */}
+              {!m.isGroup && (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input
+                    type="text"
+                    placeholder={t.overlayMsgReply}
+                    defaultValue=""
+                    onChange={(e) => {
+                      replyTexts.current[m.id] = e.target.value;
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        sendReply(m.id, m.friendshipId);
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      height: 30,
+                      borderRadius: 6,
+                      border: "1px solid var(--border-color)",
+                      background: "var(--bg-input)",
+                      color: "var(--text-primary)",
+                      padding: "0 8px",
+                      fontSize: 12,
+                      fontFamily: "inherit",
+                      outline: "none",
+                    }}
+                  />
+                  <button
+                    onClick={() => sendReply(m.id, m.friendshipId)}
+                    title={t.overlaySend}
+                    style={{
+                      width: 30, height: 30, borderRadius: 6, border: "none",
+                      background: "var(--accent)", color: "#fff",
+                      cursor: "pointer", display: "flex",
+                      alignItems: "center", justifyContent: "center", flexShrink: 0,
+                    }}
+                  >
+                    <Send size={13} />
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
 
       {/* ── Notification toasts — bottom right ─────────────────────────── */}
       <div style={{

@@ -162,16 +162,40 @@ export default function Layout() {
               const m = msg.message as Record<string, unknown> | undefined;
               if (m) {
                 const sender = (m.display_name as string | null) || (m.username as string) || "";
-                const content = String(m.content ?? "").slice(0, 80);
-                const prefix = msg.type === "group_message" ? "Groupe · " : "";
-                nativeNotif(`${prefix}${sender} — PlanetForge`, content || "Nouveau message");
+                const content = String(m.content ?? "").slice(0, 120);
+                const prefix = msg.type === "group_message" ? "Groupe \u00b7 " : "";
+                nativeNotif(`${prefix}${sender} \u2014 PlanetForge`, content || "Nouveau message");
                 addNotification({
                   type: "info",
                   title: tRef.current.friendsTabFriends,
                   message: prefix + sender,
                   duration: 4000,
                 });
+                // Relay to overlay with quick-reply when app not focused
+                if (!document.hasFocus() && msg.type !== "group_message") {
+                  (window as Window & { api?: { overlayShowMessage?: (d: unknown) => void } }).api?.overlayShowMessage?.({
+                    id: `msg-${msg.friendship_id}-${Date.now()}`,
+                    friendshipId: msg.friendship_id as number,
+                    fromName: sender,
+                    content,
+                    isGroup: false,
+                  });
+                }
               }
+            }
+
+          } else if (msg.type === "friend_playing") {
+            const uname = (msg.display_name as string | null) || (msg.username as string) || "";
+            const gameName = msg.game_name as string | null;
+            if (gameName) {
+              const body = `${uname} ${tRef.current.friendPlaying} ${gameName}`;
+              nativeNotif("PlanetForge", body);
+              addNotification({
+                type:     "info",
+                title:    uname,
+                message:  `${tRef.current.friendPlaying} ${gameName}`,
+                duration: 5000,
+              });
             }
 
           } else if (msg.type === "achievement_unlocked") {
@@ -207,6 +231,22 @@ export default function Layout() {
       offlineTimers.current.clear();
     };
   }, [addNotification]);
+
+  // Handle quick-reply messages sent from the overlay window
+  useEffect(() => {
+    type ReplyData = { friendshipId: number; content: string };
+    type ReplyAPI  = { onOverlayReplyMessage?: (cb: (d: unknown) => void) => void };
+    (window as Window & { api?: ReplyAPI }).api?.onOverlayReplyMessage?.(async (raw) => {
+      const data = raw as ReplyData;
+      const token = getToken();
+      if (!token || !data.content?.trim() || !data.friendshipId) return;
+      await fetch(`${API_BASE}/api/messages/${data.friendshipId}`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body:    JSON.stringify({ content: data.content.trim() }),
+      });
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const navItems = [
     { path: "/home", label: t.navHome },

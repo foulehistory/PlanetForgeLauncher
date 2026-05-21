@@ -160,6 +160,17 @@ ipcMain.on("overlay:set-interactive", (_e, interactive: boolean) => {
   }
 });
 
+// ── Message overlay ────────────────────────────────────────────────────────
+ipcMain.on("overlay:show-message", (_e, data) => {
+  overlayWin?.webContents.send("overlay:show-message-fwd", data);
+  overlayWin?.setIgnoreMouseEvents(false);
+});
+
+// Reply typed in overlay → forward to main window so it can POST via HTTP
+ipcMain.on("overlay:reply-message-fwd", (_e, data) => {
+  mainWin?.webContents.send("overlay:reply-message", data);
+});
+
 ipcMain.handle("auth:login", async (_event, data: { email: string; password: string }) => {
   try {
     const response = await fetch(`${API_BASE}/api/auth/login`, {
