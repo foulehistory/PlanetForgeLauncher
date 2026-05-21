@@ -58,7 +58,6 @@ export default function Overlay() {
   const [notifs, setNotifs]     = useState<OverlayNotif[]>([]);
   const [messages, setMessages] = useState<OverlayMessage[]>([]);
   const replyTexts              = useRef<Record<string, string>>({});
-  const [, forceUpdate]         = useState(0);
 
   // Transparent background — must run before paint
   useLayoutEffect(() => {
