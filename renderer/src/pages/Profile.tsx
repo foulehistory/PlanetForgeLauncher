@@ -79,6 +79,7 @@ export default function Profile() {
   const [profile, setProfile]     = useState<ProfileData | null>(null);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(false);
+  const [tab, setTab]             = useState<"profile" | "settings">("profile");
   const [editing, setEditing]     = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [saving, setSaving]       = useState(false);
@@ -226,6 +227,27 @@ export default function Profile() {
       transition={{ duration: 0.2 }}
     >
 
+      {/* ── Tab bar ──────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 14 }}>
+        {(["profile", "settings"] as const).map((key) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            style={{
+              height: 32, padding: "0 16px", borderRadius: "var(--radius-sm)",
+              border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600,
+              fontFamily: "inherit",
+              background: tab === key ? "var(--accent)" : "var(--bg-overlay)",
+              color:      tab === key ? "#fff"          : "var(--text-muted)",
+              transition: "background 0.15s, color 0.15s",
+            }}
+          >
+            {key === "profile" ? t.profileTabProfile : t.profileTabSettings}
+          </button>
+        ))}
+      </div>
+
+      {tab === "profile" && (<>
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <div className="card" style={{ display: "flex", alignItems: "center", gap: 24, padding: "28px 32px", marginBottom: 14 }}>
 
@@ -381,8 +403,10 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* ── Settings ─────────────────────────────────────────────────── */}
-      <div className="card" style={{ marginTop: 14, padding: "20px 24px" }}>
+      </>)}
+
+      {tab === "settings" && (
+      <div className="card" style={{ padding: "20px 24px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>Paramètres</span>
           <button
@@ -417,7 +441,9 @@ export default function Profile() {
           <SettingRow label="Demandes d'amis"      desc="Autoriser les inconnus à vous envoyer une demande d'ami"    checked={settings.privacy.allow_friend_requests} onChange={(v) => setPrivacy("allow_friend_requests", v)} icon={<UserPlus size={12} />} last />
         </div>
       </div>
+      )}
 
+      {tab === "profile" && (<>
       {/* ── Achievements ─────────────────────────────────────────────── */}
       {achievements.length > 0 && (
         <div className="card" style={{ marginTop: 14, padding: "20px 24px" }}>
@@ -469,6 +495,7 @@ export default function Profile() {
           </div>
         </div>
       )}
+      </>)}
 
     </motion.div>
   );

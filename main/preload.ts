@@ -48,4 +48,20 @@ contextBridge.exposeInMainWorld("api", {
   // Main window receives the reply to POST it via HTTP
   onOverlayReplyMessage: (cb: (data: unknown) => void) =>
     ipcRenderer.on("overlay:reply-message", (_e, d) => cb(d)),
+
+  // ── Achievement overlay ──────────────────────────────────────────────────
+  overlayShowAchievement:   (data: unknown) => ipcRenderer.send("overlay:show-achievement", data),
+  onOverlayShowAchievement: (cb: (data: unknown) => void) =>
+    ipcRenderer.on("overlay:show-achievement-fwd", (_e, d) => cb(d)),
+
+  // ── Friend-request overlay ───────────────────────────────────────────────
+  overlayShowFriendRequest:   (data: unknown) => ipcRenderer.send("overlay:show-friend-request", data),
+  onOverlayShowFriendRequest: (cb: (data: unknown) => void) =>
+    ipcRenderer.on("overlay:show-friend-request-fwd", (_e, d) => cb(d)),
+  overlayAcceptRequest:       (data: unknown) => ipcRenderer.send("overlay:accept-request-fwd", data),
+  overlayDeclineRequest:      (data: unknown) => ipcRenderer.send("overlay:decline-request-fwd", data),
+  onOverlayAcceptRequest:     (cb: (data: unknown) => void) =>
+    ipcRenderer.on("overlay:accept-request", (_e, d) => cb(d)),
+  onOverlayDeclineRequest:    (cb: (data: unknown) => void) =>
+    ipcRenderer.on("overlay:decline-request", (_e, d) => cb(d)),
 });

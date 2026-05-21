@@ -127,6 +127,10 @@ type Dictionary = {
   friendPlaying: string;
   overlayMsgReply: string;
   overlaySend: string;
+  profileTabProfile: string;
+  profileTabSettings: string;
+  achievementUnlocked: string;
+  overlayFriendRequest: string;
 };
 
 const dictionaries: Record<Language, Dictionary> = {
@@ -240,6 +244,10 @@ const dictionaries: Record<Language, Dictionary> = {
     friendPlaying: "joue à",
     overlayMsgReply: "Répondre...",
     overlaySend: "Envoyer",
+    profileTabProfile: "Profil",
+    profileTabSettings: "Paramètres",
+    achievementUnlocked: "Succès débloqué !",
+    overlayFriendRequest: "Demande d'ami",
   },
   en: {
     appName: "PlanetForge Launcher",
@@ -351,6 +359,10 @@ const dictionaries: Record<Language, Dictionary> = {
     friendPlaying: "is playing",
     overlayMsgReply: "Reply...",
     overlaySend: "Send",
+    profileTabProfile: "Profile",
+    profileTabSettings: "Settings",
+    achievementUnlocked: "Achievement unlocked!",
+    overlayFriendRequest: "Friend request",
   },
   es: {
     appName: "PlanetForge Launcher",
@@ -462,6 +474,10 @@ const dictionaries: Record<Language, Dictionary> = {
     friendPlaying: "está jugando a",
     overlayMsgReply: "Responder...",
     overlaySend: "Enviar",
+    profileTabProfile: "Perfil",
+    profileTabSettings: "Ajustes",
+    achievementUnlocked: "¡Logro desbloqueado!",
+    overlayFriendRequest: "Solicitud de amistad",
   },
   de: {
     appName: "PlanetForge Launcher",
@@ -573,6 +589,10 @@ const dictionaries: Record<Language, Dictionary> = {
     friendPlaying: "spielt gerade",
     overlayMsgReply: "Antworten...",
     overlaySend: "Senden",
+    profileTabProfile: "Profil",
+    profileTabSettings: "Einstellungen",
+    achievementUnlocked: "Erfolg freigeschaltet!",
+    overlayFriendRequest: "Freundschaftsanfrage",
   },
 };
 

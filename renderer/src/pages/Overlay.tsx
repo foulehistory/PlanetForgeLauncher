@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
-import { Phone, PhoneOff, X, CheckCircle, AlertCircle, Info, AlertTriangle, MessageSquare, Send } from "lucide-react";
+import { Phone, PhoneOff, X, CheckCircle, AlertCircle, Info, AlertTriangle, MessageSquare, Send, UserPlus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useI18n } from "../shared/i18n";
 
@@ -16,6 +16,19 @@ type OverlayMessage = {
   fromName: string;
   content: string;
   isGroup: boolean;
+};
+
+type OverlayAchievement = {
+  id: string;
+  icon: string;
+  title: string;
+  description: string;
+};
+
+type OverlayFriendRequest = {
+  id: string;
+  friendshipId: number;
+  fromName: string;
 };
 
 type OverlayNotif = {
@@ -37,6 +50,10 @@ type OverlayAPI = {
   overlayReplyMessage?:  (data: { friendshipId: number; content: string }) => void;
   overlaySetInteractive?: (v: boolean) => void;
   overlaySetFocusable?:   (v: boolean) => void;
+  onOverlayShowAchievement?:  (cb: (d: OverlayAchievement) => void) => void;
+  onOverlayShowFriendRequest?: (cb: (d: OverlayFriendRequest) => void) => void;
+  overlayAcceptRequest?:      (data: { friendshipId: number }) => void;
+  overlayDeclineRequest?:     (data: { friendshipId: number }) => void;
 };
 
 const notifColors = {
@@ -57,7 +74,9 @@ export default function Overlay() {
   const { t } = useI18n();
   const [call, setCall]         = useState<OverlayCallData | null>(null);
   const [notifs, setNotifs]     = useState<OverlayNotif[]>([]);
-  const [messages, setMessages] = useState<OverlayMessage[]>([]);
+  const [messages, setMessages]         = useState<OverlayMessage[]>([]);
+  const [achievements, setAchievements] = useState<OverlayAchievement[]>([]);
+  const [friendReqs, setFriendReqs]     = useState<OverlayFriendRequest[]>([]);
   const replyTexts              = useRef<Record<string, string>>({});
 
   // Transparent background — must run before paint
@@ -98,19 +117,55 @@ export default function Overlay() {
         setMessages((prev) => prev.filter((m) => m.id !== d.id)), 30_000
       );
     });
+
+    api.onOverlayShowAchievement?.((d) => {
+      setAchievements((prev) => {
+        if (prev.some((a) => a.id === d.id)) return prev;
+        return [...prev, d];
+      });
+      setTimeout(() =>
+        setAchievements((prev) => prev.filter((a) => a.id !== d.id)), 8_000
+      );
+    });
+
+    api.onOverlayShowFriendRequest?.((d) => {
+      setFriendReqs((prev) => {
+        if (prev.some((r) => r.id === d.id)) return prev;
+        return [...prev, d];
+      });
+      setTimeout(() =>
+        setFriendReqs((prev) => prev.filter((r) => r.id !== d.id)), 30_000
+      );
+    });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Toggle click-through based on visible content
   useEffect(() => {
     const api = (window as Window & { api?: OverlayAPI }).api;
-    api?.overlaySetInteractive?.(call !== null || notifs.length > 0 || messages.length > 0);
-  }, [call, notifs.length, messages.length]);
+    api?.overlaySetInteractive?.(
+      call !== null || notifs.length > 0 || messages.length > 0 ||
+      achievements.length > 0 || friendReqs.length > 0
+    );
+  }, [call, notifs.length, messages.length, achievements.length, friendReqs.length]);
 
   // Allow keyboard input in reply field when message cards are visible
   useEffect(() => {
     const api = (window as Window & { api?: OverlayAPI }).api;
-    api?.overlaySetFocusable?.(messages.length > 0);
-  }, [messages.length]);
+    api?.overlaySetFocusable?.(messages.length > 0 || friendReqs.length > 0);
+  }, [messages.length, friendReqs.length]);
+
+  const dismissAchievement = (id: string) =>
+    setAchievements((prev) => prev.filter((a) => a.id !== id));
+
+  const acceptFriendReq = (id: string, friendshipId: number) => {
+    (window as Window & { api?: OverlayAPI }).api?.overlayAcceptRequest?.({ friendshipId });
+    setFriendReqs((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  const declineFriendReq = (id: string, friendshipId: number) => {
+    (window as Window & { api?: OverlayAPI }).api?.overlayDeclineRequest?.({ friendshipId });
+    setFriendReqs((prev) => prev.filter((r) => r.id !== id));
+  };
 
   const accept = () => {
     (window as Window & { api?: OverlayAPI }).api?.overlayAcceptCall?.();
@@ -402,6 +457,180 @@ export default function Overlay() {
               </motion.div>
             );
           })}
+        </AnimatePresence>
+      </div>
+
+      {/* ── Friend-request cards — top right column (with call/msg) ─────── */}
+      <AnimatePresence mode="popLayout">
+        {friendReqs.map((r) => (
+          <motion.div
+            key={r.id}
+            layout
+            initial={{ opacity: 0, x: 80, scale: 0.92 }}
+            animate={{ opacity: 1, x: 0,  scale: 1    }}
+            exit={{    opacity: 0, x: 80, scale: 0.92 }}
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            style={{
+              position: "absolute",
+              top: 20,
+              right: 20,
+              background: "var(--bg-surface)",
+              border: "1px solid var(--accent)",
+              borderRadius: 12,
+              padding: "12px 14px",
+              minWidth: 260,
+              maxWidth: 320,
+              boxShadow: "0 8px 40px rgba(0,0,0,0.75)",
+              pointerEvents: "auto",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: "50%",
+                background: "var(--accent-dim)",
+                border: "1.5px solid var(--accent)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0,
+              }}>
+                <UserPlus size={16} color="var(--accent)" />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 1 }}>
+                  {t.overlayFriendRequest}
+                </div>
+                <div style={{
+                  fontSize: 13, fontWeight: 700,
+                  color: "var(--text-primary)",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>
+                  {r.fromName}
+                </div>
+              </div>
+              <button
+                onClick={() => setFriendReqs((p) => p.filter((x) => x.id !== r.id))}
+                style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--text-muted)", display: "flex" }}
+              >
+                <X size={12} />
+              </button>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => acceptFriendReq(r.id, r.friendshipId)}
+                style={{
+                  flex: 1, height: 30, borderRadius: 7, border: "none",
+                  background: "var(--accent)", color: "#fff",
+                  fontWeight: 600, fontSize: 11, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                  fontFamily: "inherit",
+                }}
+              >
+                {t.friendsAccept}
+              </button>
+              <button
+                onClick={() => declineFriendReq(r.id, r.friendshipId)}
+                style={{
+                  flex: 1, height: 30, borderRadius: 7, border: "none",
+                  background: "var(--bg-overlay)", color: "var(--color-danger)",
+                  border: "1px solid var(--color-danger)",
+                  fontWeight: 600, fontSize: 11, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                  fontFamily: "inherit",
+                }}
+              >
+                {t.friendsDecline}
+              </button>
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+
+      {/* ── Achievement notifications — bottom center, dramatic ──────────── */}
+      <div style={{
+        position: "absolute",
+        bottom: 60,
+        left: "50%",
+        transform: "translateX(-50%)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 12,
+        pointerEvents: "none",
+      }}>
+        <AnimatePresence mode="popLayout">
+          {achievements.map((a) => (
+            <motion.div
+              key={a.id}
+              layout
+              initial={{ opacity: 0, y: 60, scale: 0.8 }}
+              animate={{ opacity: 1, y: 0,  scale: 1   }}
+              exit={{    opacity: 0, y: 40, scale: 0.9  }}
+              transition={{ type: "spring", stiffness: 320, damping: 22 }}
+              style={{
+                background: "linear-gradient(135deg, #1a1506 0%, var(--bg-surface) 60%)",
+                border: "1.5px solid #FFD700",
+                borderRadius: 16,
+                padding: "18px 24px",
+                minWidth: 280,
+                maxWidth: 380,
+                boxShadow: "0 0 40px rgba(255,215,0,0.25), 0 8px 40px rgba(0,0,0,0.8)",
+                pointerEvents: "auto",
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+              }}
+            >
+              {/* Animated icon */}
+              <motion.span
+                style={{ fontSize: 40, lineHeight: 1, flexShrink: 0, display: "inline-block" }}
+                animate={{
+                  scale:  [1, 1.25, 1, 1.15, 1],
+                  rotate: [0, -8, 8, -4, 0],
+                  filter: [
+                    "drop-shadow(0 0 4px #FFD700)",
+                    "drop-shadow(0 0 22px #FFD700)",
+                    "drop-shadow(0 0 4px #FFD700)",
+                    "drop-shadow(0 0 16px #FFD700)",
+                    "drop-shadow(0 0 4px #FFD700)",
+                  ],
+                }}
+                transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+              >
+                {a.icon}
+              </motion.span>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: 10, fontWeight: 700, letterSpacing: "0.1em",
+                  textTransform: "uppercase", color: "#FFD700", marginBottom: 3,
+                }}>
+                  {t.achievementUnlocked}
+                </div>
+                <div style={{
+                  fontSize: 15, fontWeight: 700,
+                  color: "var(--text-primary)",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>
+                  {a.title}
+                </div>
+                {a.description && (
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                    {a.description}
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={() => dismissAchievement(a.id)}
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  padding: 4, color: "var(--text-muted)", flexShrink: 0,
+                  display: "flex", alignItems: "center",
+                }}
+              >
+                <X size={13} />
+              </button>
+            </motion.div>
+          ))}
         </AnimatePresence>
       </div>
     </div>

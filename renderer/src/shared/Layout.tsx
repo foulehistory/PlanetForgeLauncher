@@ -120,8 +120,14 @@ export default function Layout() {
             if (knownRequestIds.current.has(fid)) return;
             knownRequestIds.current.add(fid);
             const name = (msg.display_name as string | null) || (msg.username as string);
-            nativeNotif("Demande d'ami — PlanetForge", `${name} vous a envoyé une demande d'ami.`);
-            addNotification({
+            nativeNotif("Demande d'ami — PlanetForge", `${name} vous a envoyé une demande d'ami.`);            // Show in overlay when app not focused
+            if (!document.hasFocus()) {
+              (window as Window & { api?: { overlayShowFriendRequest?: (d: unknown) => void } }).api?.overlayShowFriendRequest?.({
+                id: `fr-${fid}`,
+                friendshipId: fid,
+                fromName: name,
+              });
+            }            addNotification({
               type:     "info",
               title:    tRef.current.friendsTabRequests,
               message:  name,
@@ -203,12 +209,16 @@ export default function Layout() {
           } else if (msg.type === "achievement_unlocked") {
             const ach = msg.achievement as Record<string, unknown> | undefined;
             if (ach) {
-              nativeNotif(`${ach.icon ?? "🏆"} Succès débloqué ! — PlanetForge`, String(ach.title ?? ""));
-              addNotification({
-                type:     "info",
-                title:    `${ach.icon ?? "🏆"} Succès débloqué !`,
-                message:  String(ach.title ?? ""),
-                duration: 6000,
+              const icon  = String(ach.icon ?? "\uD83C\uDFC6");
+              const title = String(ach.title ?? "");
+              const desc  = String(ach.description ?? "");
+              nativeNotif(`${icon} Succ\u00e8s d\u00e9bloqu\u00e9 ! \u2014 PlanetForge`, title);
+              // Always relay to overlay (user is likely gaming)
+              (window as Window & { api?: { overlayShowAchievement?: (d: unknown) => void } }).api?.overlayShowAchievement?.({
+                id: `ach-${Date.now()}`,
+                icon,
+                title,
+                description: desc,
               });
             }
           }
@@ -247,6 +257,36 @@ export default function Layout() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body:    JSON.stringify({ content: data.content.trim() }),
       });
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Handle friend-request accept / decline from overlay
+  useEffect(() => {
+    type ReqData = { friendshipId: number };
+    type ReqAPI  = {
+      onOverlayAcceptRequest?:  (cb: (d: unknown) => void) => void;
+      onOverlayDeclineRequest?: (cb: (d: unknown) => void) => void;
+    };
+    const api = (window as Window & { api?: ReqAPI }).api;
+    api?.onOverlayAcceptRequest?.(async (raw) => {
+      const { friendshipId } = raw as ReqData;
+      const token = getToken();
+      if (!token) return;
+      await fetch(`${API_BASE}/api/friends/${friendshipId}/accept`, {
+        method: "PATCH", headers: { Authorization: `Bearer ${token}` },
+      });
+      knownRequestIds.current.delete(friendshipId);
+      setFriendsReloadKey((k) => k + 1);
+    });
+    api?.onOverlayDeclineRequest?.(async (raw) => {
+      const { friendshipId } = raw as ReqData;
+      const token = getToken();
+      if (!token) return;
+      await fetch(`${API_BASE}/api/friends/${friendshipId}/decline`, {
+        method: "PATCH", headers: { Authorization: `Bearer ${token}` },
+      });
+      knownRequestIds.current.delete(friendshipId);
+      setFriendsReloadKey((k) => k + 1);
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

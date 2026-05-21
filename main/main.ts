@@ -176,6 +176,26 @@ ipcMain.on("overlay:reply-message-fwd", (_e, data) => {
   mainWin?.webContents.send("overlay:reply-message", data);
 });
 
+// ── Achievement overlay ────────────────────────────────────────────
+ipcMain.on("overlay:show-achievement", (_e, data) => {
+  overlayWin?.webContents.send("overlay:show-achievement-fwd", data);
+  overlayWin?.setIgnoreMouseEvents(false);
+});
+
+// ── Friend-request overlay ───────────────────────────────────────
+ipcMain.on("overlay:show-friend-request", (_e, data) => {
+  overlayWin?.webContents.send("overlay:show-friend-request-fwd", data);
+  overlayWin?.setIgnoreMouseEvents(false);
+});
+
+// Overlay friend-request buttons → forward answer to main window
+ipcMain.on("overlay:accept-request-fwd", (_e, data) => {
+  mainWin?.webContents.send("overlay:accept-request", data);
+});
+ipcMain.on("overlay:decline-request-fwd", (_e, data) => {
+  mainWin?.webContents.send("overlay:decline-request", data);
+});
+
 ipcMain.handle("auth:login", async (_event, data: { email: string; password: string }) => {
   try {
     const response = await fetch(`${API_BASE}/api/auth/login`, {
