@@ -128,14 +128,16 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
   const remoteVideoRef  = useRef<HTMLVideoElement | null>(null);
   useEffect(() => { activeTargetRef.current = activeTarget; }, [activeTarget]);
   // Attach remote screen stream to the <video> element whenever it changes
+  // or when the overlay is re-shown after being hidden.
   useEffect(() => {
-    if (!remoteVideoRef.current) return;
-    remoteVideoRef.current.srcObject = remoteScreenStream;
+    const el = remoteVideoRef.current;
+    if (!el) return;
+    el.srcObject = remoteScreenStream;
     if (remoteScreenStream) {
-      remoteVideoRef.current.volume = remoteVideoVolume;
-      remoteVideoRef.current.play().catch(() => {});
+      el.volume = remoteVideoVolume;
+      el.play().catch(() => {});
     }
-  }, [remoteScreenStream]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [remoteScreenStream, remoteScreenHidden]); // eslint-disable-line react-hooks/exhaustive-deps
   // Sync audio volume of the remote screen share video
   useEffect(() => {
     if (remoteVideoRef.current) remoteVideoRef.current.volume = remoteVideoVolume;
@@ -210,10 +212,13 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
         audioEl.srcObject = ev.streams[0];
         audioEl.play().catch(() => { /* autoplay policy — rare in Electron */ });
       } else if (ev.track.kind === "video") {
-        peerScreenShareStreamId = ev.streams[0]?.id ?? null;
-        setRemoteScreenStream(ev.streams[0]);
+        // Fallback: some WebRTC impls fire ontrack with an empty ev.streams array
+        const stream = ev.streams[0] ?? new MediaStream([ev.track]);
+        peerScreenShareStreamId = stream.id;
+        setRemoteScreenStream(stream);
         setRemoteScreenFrom(name);
         setScreenMinimized(false);
+        setRemoteScreenHidden(false);
       }
     };
 
@@ -843,7 +848,16 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
           }}
         >
           <video
-            ref={remoteVideoRef}
+            ref={(el) => {
+              remoteVideoRef.current = el;
+              // Attach srcObject immediately on mount — useEffect alone can miss
+              // the case where the element remounts (hide→show) without stream changing.
+              if (el && remoteScreenStream) {
+                el.srcObject = remoteScreenStream;
+                el.volume = remoteVideoVolume;
+                el.play().catch(() => {});
+              }
+            }}
             autoPlay
             playsInline
             style={{ width: "100%", height: "100%", objectFit: "contain" }}
