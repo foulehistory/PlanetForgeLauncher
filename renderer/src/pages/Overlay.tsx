@@ -529,9 +529,9 @@ export default function Overlay() {
               <button
                 onClick={() => declineFriendReq(r.id, r.friendshipId)}
                 style={{
-                  flex: 1, height: 30, borderRadius: 7, border: "none",
-                  background: "var(--bg-overlay)", color: "var(--color-danger)",
+                  flex: 1, height: 30, borderRadius: 7,
                   border: "1px solid var(--color-danger)",
+                  background: "var(--bg-overlay)", color: "var(--color-danger)",
                   fontWeight: 600, fontSize: 11, cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                   fontFamily: "inherit",
