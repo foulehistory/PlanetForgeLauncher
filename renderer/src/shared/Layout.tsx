@@ -164,21 +164,23 @@ export default function Layout() {
                 const sender = (m.display_name as string | null) || (m.username as string) || "";
                 const content = String(m.content ?? "").slice(0, 120);
                 const prefix = msg.type === "group_message" ? "Groupe \u00b7 " : "";
-                nativeNotif(`${prefix}${sender} \u2014 PlanetForge`, content || "Nouveau message");
-                addNotification({
-                  type: "info",
-                  title: tRef.current.friendsTabFriends,
-                  message: prefix + sender,
-                  duration: 4000,
-                });
-                // Relay to overlay with quick-reply when app not focused
-                if (!document.hasFocus() && msg.type !== "group_message") {
+                // Show overlay card with reply when app is not focused (DMs only)
+                const showedOverlay = !document.hasFocus() && msg.type !== "group_message";
+                if (showedOverlay) {
                   (window as Window & { api?: { overlayShowMessage?: (d: unknown) => void } }).api?.overlayShowMessage?.({
                     id: `msg-${msg.friendship_id}-${Date.now()}`,
                     friendshipId: msg.friendship_id as number,
                     fromName: sender,
                     content,
                     isGroup: false,
+                  });
+                } else {
+                  nativeNotif(`${prefix}${sender} \u2014 PlanetForge`, content || "Nouveau message");
+                  addNotification({
+                    type: "info",
+                    title: tRef.current.friendsTabFriends,
+                    message: prefix + sender,
+                    duration: 4000,
                   });
                 }
               }

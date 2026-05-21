@@ -160,6 +160,11 @@ ipcMain.on("overlay:set-interactive", (_e, interactive: boolean) => {
   }
 });
 
+// Allow keyboard input in overlay when a message card is visible
+ipcMain.on("overlay:set-focusable", (_e, focusable: boolean) => {
+  overlayWin?.setFocusable(focusable);
+});
+
 // ── Message overlay ────────────────────────────────────────────────────────
 ipcMain.on("overlay:show-message", (_e, data) => {
   overlayWin?.webContents.send("overlay:show-message-fwd", data);

@@ -36,6 +36,7 @@ type OverlayAPI = {
   overlayDeclineCall?:   () => void;
   overlayReplyMessage?:  (data: { friendshipId: number; content: string }) => void;
   overlaySetInteractive?: (v: boolean) => void;
+  overlaySetFocusable?:   (v: boolean) => void;
 };
 
 const notifColors = {
@@ -104,6 +105,12 @@ export default function Overlay() {
     const api = (window as Window & { api?: OverlayAPI }).api;
     api?.overlaySetInteractive?.(call !== null || notifs.length > 0 || messages.length > 0);
   }, [call, notifs.length, messages.length]);
+
+  // Allow keyboard input in reply field when message cards are visible
+  useEffect(() => {
+    const api = (window as Window & { api?: OverlayAPI }).api;
+    api?.overlaySetFocusable?.(messages.length > 0);
+  }, [messages.length]);
 
   const accept = () => {
     (window as Window & { api?: OverlayAPI }).api?.overlayAcceptCall?.();

@@ -34,6 +34,8 @@ contextBridge.exposeInMainWorld("api", {
 
   // Overlay controls its own click-through state
   overlaySetInteractive: (interactive: boolean) => ipcRenderer.send("overlay:set-interactive", interactive),
+  // Make overlay focusable so keyboard works in reply input
+  overlaySetFocusable:   (v: boolean) => ipcRenderer.send("overlay:set-focusable", v),
 
   // ── Message overlay ──────────────────────────────────────────────────────
   // Main window → overlay: show a message card with reply input
