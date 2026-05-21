@@ -29,6 +29,7 @@ function AnimatedRoutes() {
       }>
         <Route path="/home"    element={<Home />} />
         <Route path="/shop" element={<Shop />} />
+        <Route path="/shop/:gameId" element={<Shop />} />
         <Route path="/library" element={<Library />} />
         <Route path="/engine" element={<Engine />} />
         <Route path="/profile" element={<Profile />} />

@@ -333,7 +333,9 @@ export default function Layout() {
           <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap" }}>{t.appName}</span>
           <nav className="header-nav" aria-label="Primary">
             {navItems.map((item) => {
-              const isActive = location.pathname === item.path;
+              const isActive = item.path === "/shop"
+                ? location.pathname === "/shop" || location.pathname.startsWith("/shop/")
+                : location.pathname === item.path;
               return (
                 <button
                   key={item.path}
