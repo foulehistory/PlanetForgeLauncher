@@ -5,6 +5,7 @@ import Shop from "./pages/Shop";
 import Library from "./pages/Library";
 import Engine from "./pages/Engine";
 import Profile from "./pages/Profile";
+import Overlay from "./pages/Overlay";
 import ProtectedRoute from "./shared/ProtectedRoute";
 import Layout  from "./shared/Layout";
 import { I18nProvider } from "./shared/i18n";
@@ -16,6 +17,9 @@ function AnimatedRoutes() {
 
       {/* Auth — sans layout */}
       <Route path="/" element={<Auth />} />
+
+      {/* Overlay window — aucune auth, aucun layout */}
+      <Route path="/overlay" element={<Overlay />} />
 
       {/* Routes protégées — avec layout (Layout ne se remonte pas lors des navigations) */}
       <Route element={

@@ -38,6 +38,17 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     setNotifications((prev) => [...prev, fullNotification]);
 
+    // Relay to overlay when app is not in focus
+    if (!document.hasFocus()) {
+      (window as Window & { api?: { overlayShowNotif?: (d: unknown) => void } }).api?.overlayShowNotif?.({
+        id,
+        type:     fullNotification.type,
+        title:    fullNotification.title,
+        message:  fullNotification.message,
+        duration: fullNotification.duration,
+      });
+    }
+
     // Auto-close if duration > 0
     const duration = fullNotification.duration ?? 0;
     if (duration > 0) {
@@ -51,6 +62,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const removeNotification = useCallback((id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
+    (window as Window & { api?: { overlayRemoveNotif?: (id: string) => void } }).api?.overlayRemoveNotif?.(id);
   }, []);
 
   const value = useMemo<NotificationContextValue>(

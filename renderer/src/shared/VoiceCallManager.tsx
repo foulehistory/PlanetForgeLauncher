@@ -347,6 +347,7 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
     });
     setCallStatus("connected");
     setIncomingCall(null);
+    (window as Window & { api?: { overlayHideCall?: () => void } }).api?.overlayHideCall?.();
     stopRingtone();
     if (dmTimeoutRef.current)  { clearTimeout(dmTimeoutRef.current);  dmTimeoutRef.current  = null; }
 
@@ -374,8 +375,23 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
     }
     stopRingtone();
     setIncomingCall(null);
+    (window as Window & { api?: { overlayHideCall?: () => void } }).api?.overlayHideCall?.();
   }, [incomingCall, wsSend, stopRingtone]);
+  // ─── Overlay call listener (accept / decline from overlay window) ─────────────
+  const acceptCallRef = useRef<() => void>(() => {});
+  useEffect(() => { acceptCallRef.current = acceptCall; }, [acceptCall]);
+  const declineCallRef = useRef<() => void>(() => {});
+  useEffect(() => { declineCallRef.current = declineCall; }, [declineCall]);
 
+  useEffect(() => {
+    type OverlayListenerAPI = {
+      onOverlayCallAccepted?: (cb: () => void) => void;
+      onOverlayCallDeclined?: (cb: () => void) => void;
+    };
+    const api = (window as Window & { api?: OverlayListenerAPI }).api;
+    api?.onOverlayCallAccepted?.(() => acceptCallRef.current());
+    api?.onOverlayCallDeclined?.(() => declineCallRef.current());
+  }, []);
   // ─── Screen share ─────────────────────────────────────────────────────────
   const stopScreenShare = useCallback(() => {
     if (!screenStream.current) return;
@@ -499,6 +515,13 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
           groupId:    msg.group_id as number | undefined,
           sdp,
         });
+        // Relay to overlay — visible even when launcher is not focused
+        (window as Window & { api?: { overlayShowCall?: (d: unknown) => void } }).api?.overlayShowCall?.({
+          fromUserId: fromId,
+          fromName,
+          callType:  (msg.call_type as "dm" | "group") ?? "dm",
+          groupId:   msg.group_id as number | undefined,
+        });
       } else if (type === "rtc_answer") {
         const fromId = msg.from_user_id as number;
         const peer   = peers.current.get(fromId);
@@ -547,6 +570,7 @@ export default function VoiceCallManager({ wsRef, myId }: Props) {
         // Dismiss incoming call modal if the caller cancelled before we answered
         stopRingtone();
         setIncomingCall(null);
+        (window as Window & { api?: { overlayHideCall?: () => void } }).api?.overlayHideCall?.();
         hangUpAll(false);
       }
     };

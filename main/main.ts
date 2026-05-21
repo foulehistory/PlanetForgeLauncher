@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, Notification, desktopCapturer } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, Notification, desktopCapturer, screen as electronScreen } from "electron";
 import path from "path";
 import { autoUpdater } from "electron-updater";
 
@@ -26,6 +26,9 @@ function isNoPublishedReleaseError(error: unknown): boolean {
 }
 
 
+let mainWin: BrowserWindow | null = null;
+let overlayWin: BrowserWindow | null = null;
+
 const iconPath = () => {
   if (process.platform === "win32")   return path.join(__dirname, "../renderer/public/icon.ico");
   if (process.platform === "darwin")  return path.join(__dirname, "../renderer/public/icon.icns");
@@ -33,8 +36,7 @@ const iconPath = () => {
 };
 
 function createWindow() {
-  console.log("icon path: ", iconPath());
-  const win = new BrowserWindow({
+  mainWin = new BrowserWindow({
     width: 1280,
     height: 800,
     icon: iconPath(),
@@ -48,17 +50,52 @@ function createWindow() {
     },
   });
 
-  win.once("ready-to-show", () => win.show());
+  mainWin.once("ready-to-show", () => mainWin?.show());
 
   if (app.isPackaged) {
-    win.loadFile(path.join(process.resourcesPath, "app/renderer/dist/index.html"));
+    mainWin.loadFile(path.join(process.resourcesPath, "app/renderer/dist/index.html"));
   } else {
-    win.loadURL("http://localhost:5173");
+    mainWin.loadURL("http://localhost:5173");
+  }
+}
+
+function createOverlayWindow() {
+  const { width, height } = electronScreen.getPrimaryDisplay().workAreaSize;
+  overlayWin = new BrowserWindow({
+    width,
+    height,
+    x: 0,
+    y: 0,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    focusable: false,
+    resizable: false,
+    hasShadow: false,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  overlayWin.setIgnoreMouseEvents(true, { forward: true });
+  overlayWin.setAlwaysOnTop(true, "screen-saver");
+  overlayWin.once("ready-to-show", () => overlayWin?.show());
+  if (app.isPackaged) {
+    overlayWin.loadFile(
+      path.join(process.resourcesPath, "app/renderer/dist/index.html"),
+      { hash: "/overlay" }
+    );
+  } else {
+    overlayWin.loadURL("http://localhost:5173/#/overlay");
   }
 }
 
 app.whenReady().then(() => {
     createWindow();
+    createOverlayWindow();
     Menu.setApplicationMenu(null);
 });
 
@@ -86,6 +123,41 @@ ipcMain.handle("get-screen-sources", async () => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
+});
+
+// ── Overlay IPC relay ─────────────────────────────────────────────────────────
+ipcMain.on("overlay:show-call", (_e, data) => {
+  overlayWin?.webContents.send("overlay:show-call-fwd", data);
+  overlayWin?.setIgnoreMouseEvents(false);
+});
+
+ipcMain.on("overlay:hide-call", () => {
+  overlayWin?.webContents.send("overlay:hide-call-fwd");
+});
+
+ipcMain.on("overlay:show-notif", (_e, data) => {
+  overlayWin?.webContents.send("overlay:show-notif-fwd", data);
+  overlayWin?.setIgnoreMouseEvents(false);
+});
+
+ipcMain.on("overlay:remove-notif", (_e, id) => {
+  overlayWin?.webContents.send("overlay:remove-notif-fwd", id);
+});
+
+ipcMain.on("overlay:call-accepted-fwd", () => {
+  mainWin?.webContents.send("overlay:call-accepted");
+});
+
+ipcMain.on("overlay:call-declined-fwd", () => {
+  mainWin?.webContents.send("overlay:call-declined");
+});
+
+ipcMain.on("overlay:set-interactive", (_e, interactive: boolean) => {
+  if (interactive) {
+    overlayWin?.setIgnoreMouseEvents(false);
+  } else {
+    overlayWin?.setIgnoreMouseEvents(true, { forward: true });
+  }
 });
 
 ipcMain.handle("auth:login", async (_event, data: { email: string; password: string }) => {
