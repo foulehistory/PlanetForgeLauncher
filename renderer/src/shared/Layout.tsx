@@ -1,3 +1,4 @@
+declare const __APP_VERSION__: string;
 import { Globe, LogOut, User, Users } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -340,7 +341,7 @@ export default function Layout() {
             }}
           />
           <span style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {t.appName} {currentYear} · {t.connected}
+            {t.appName} {currentYear} · {t.connected} | v{__APP_VERSION__}
           </span>
         </div>
 
