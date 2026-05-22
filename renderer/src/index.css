@@ -408,6 +408,220 @@ a:hover { color: var(--accent-hover); }
   background: var(--accent-dim);
 }
 
+/* ── Library game detail page ───────────────────────────────────────────── */
+.library-game-page {
+  display: grid;
+  gap: 14px;
+}
+
+.library-game-breadcrumb-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.library-game-back {
+  width: fit-content;
+}
+
+.library-game-breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.library-game-breadcrumb .sep {
+  opacity: 0.6;
+}
+
+.library-game-breadcrumb strong {
+  color: var(--text-primary);
+}
+
+.library-game-hero-card {
+  overflow: hidden;
+  padding: 0;
+}
+
+.library-game-hero-banner {
+  position: relative;
+  height: 210px;
+  background: #111;
+}
+
+.library-game-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,.25), rgba(0,0,0,.86));
+}
+
+.library-game-hero-content {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 14px;
+  display: grid;
+  grid-template-columns: 88px 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.library-game-cover-frame {
+  width: 88px;
+  height: 120px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.25);
+  background: rgba(0,0,0,.4);
+}
+
+.library-game-title {
+  color: #fff;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.library-game-badges {
+  margin-top: 6px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.library-game-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.library-game-meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.library-game-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.library-game-trophies-card {
+  padding: 16px;
+}
+
+.library-game-trophies-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.library-game-trophies-title {
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.library-game-trophies-sub,
+.library-game-trophies-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.library-game-progress-wrap {
+  margin-bottom: 12px;
+}
+
+.library-game-progress-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.library-game-progress-track {
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-surf);
+}
+
+.library-game-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.library-game-filter-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.library-game-trophy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.library-game-skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.09), rgba(255,255,255,0.04));
+  background-size: 200% 100%;
+  animation: library-shimmer 1.4s linear infinite;
+}
+
+.library-game-skeleton-hero {
+  height: 210px;
+  border-radius: 0;
+}
+
+.library-game-skeleton-card {
+  height: 92px;
+}
+
+@keyframes library-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .library-game-hero-banner {
+    height: auto;
+    min-height: 220px;
+  }
+
+  .library-game-hero-content {
+    position: relative;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 12px;
+    grid-template-columns: 72px 1fr;
+  }
+
+  .library-game-actions {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+}
+
 /* ── Friends panel ────────────────────────────────────────────── */
 .friend-row:hover {
   background: var(--bg-overlay);

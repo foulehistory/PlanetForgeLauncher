@@ -10,6 +10,7 @@ import { useNotification, useNotificationHelpers } from "./Notifications";
 import FriendsPanel from "./FriendsPanel";
 import VoiceCallManager from "./VoiceCallManager";
 import { API_BASE, WS_BASE } from "../config";
+import type { InstallProgress } from "../types/global";
 
 function getToken(): string | null {
   const rememberMe = localStorage.getItem("remember-me") === "true";
@@ -37,6 +38,7 @@ export default function Layout() {
   const [friendsPanelOpen, setFriendsPanelOpen] = useState(false);
   const [friendsReloadKey, setFriendsReloadKey] = useState(0);
   const [unreadMsg, setUnreadMsg] = useState(0);
+  const [installProgress, setInstallProgress] = useState<InstallProgress | null>(null);
   const friendsPanelOpenRef = useRef(false);
   useEffect(() => { friendsPanelOpenRef.current = friendsPanelOpen; }, [friendsPanelOpen]);
   const wsRef = useRef<WebSocket | null>(null);
@@ -54,6 +56,16 @@ export default function Layout() {
   // Stable ref so polling closure always uses latest t (updated after every render)
   const tRef = useRef(t);
   useEffect(() => { tRef.current = t; });
+
+  useEffect(() => {
+    const un = window.api?.onInstallProgress?.((p) => {
+      setInstallProgress(p);
+      if (p.stage === "completed" || p.stage === "failed") {
+        setTimeout(() => setInstallProgress(null), 4500);
+      }
+    });
+    return () => { un?.(); };
+  }, []);
 
   // Online user IDs tracked via WebSocket
   const [onlineUserIds, setOnlineUserIds] = useState<Set<number>>(new Set());
@@ -335,7 +347,9 @@ export default function Layout() {
             {navItems.map((item) => {
               const isActive = item.path === "/shop"
                 ? location.pathname === "/shop" || location.pathname.startsWith("/shop/")
-                : location.pathname === item.path;
+                : item.path === "/library"
+                  ? location.pathname === "/library" || location.pathname.startsWith("/library/")
+                  : location.pathname === item.path;
               return (
                 <button
                   key={item.path}
@@ -467,6 +481,56 @@ export default function Layout() {
       </footer>
 
       <NotificationManager />
+
+      {installProgress && (
+        <div style={{
+          position: "fixed",
+          left: 12,
+          bottom: 46,
+          width: 320,
+          zIndex: 999,
+          background: "rgba(10, 14, 24, 0.92)",
+          border: "1px solid var(--border)",
+          borderRadius: 10,
+          padding: 10,
+          boxShadow: "0 14px 28px rgba(0,0,0,.35)",
+          backdropFilter: "blur(8px)",
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
+            <strong style={{ fontSize: 12, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {installProgress.gameTitle}
+            </strong>
+            <span className="badge badge-blue" style={{ fontSize: 10 }}>
+              {installProgress.stage}
+            </span>
+          </div>
+
+          <div style={{ height: 6, borderRadius: 999, background: "rgba(255,255,255,.08)", overflow: "hidden", marginBottom: 8 }}>
+            <div style={{
+              width: `${Math.max(0, Math.min(100, installProgress.percent))}%`,
+              height: "100%",
+              background: installProgress.stage === "failed"
+                ? "var(--color-danger)"
+                : "linear-gradient(90deg, #3aa0ff, #66e0ff)",
+              transition: "width .25s ease",
+            }} />
+          </div>
+
+          <div style={{ display: "grid", gap: 3, fontSize: 11, color: "var(--text-secondary)" }}>
+            <span>{installProgress.percent}% {installProgress.message ? `• ${installProgress.message}` : ""}</span>
+            {(installProgress.stage === "downloading" || installProgress.stage === "extracting") && (
+              <span>
+                {installProgress.stage === "downloading"
+                  ? `${(installProgress.downloadedBytes / (1024 * 1024)).toFixed(1)} / ${Math.max(0.1, installProgress.totalBytes / (1024 * 1024)).toFixed(1)} MB`
+                  : "Décompression des fichiers..."}
+              </span>
+            )}
+            {installProgress.stage === "downloading" && (
+              <span>{installProgress.speedMbps.toFixed(2)} Mbps • drops: {installProgress.drops}</span>
+            )}
+          </div>
+        </div>
+      )}
 
       <FriendsPanel isOpen={friendsPanelOpen} onClose={() => setFriendsPanelOpen(false)} reloadKey={friendsReloadKey} onlineUserIds={onlineUserIds} />
 

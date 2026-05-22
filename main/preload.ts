@@ -5,10 +5,20 @@ contextBridge.exposeInMainWorld("api", {
   register:    (data: unknown) => ipcRenderer.invoke("auth:register", data),
   refresh:     (data: unknown) => ipcRenderer.invoke("auth:refresh", data),
   getLibrary:  () => ipcRenderer.invoke("library:get"),
-  installGame: (id: string)   => ipcRenderer.invoke("game:install", id),
+  installGame: (data: { gameId: number; gameTitle: string; token: string; version?: string | null }) =>
+    ipcRenderer.invoke("game:install", data),
+  playGame: (data: { gameId: number; gameTitle: string; token: string; installPath: string; executablePath?: string | null }) =>
+    ipcRenderer.invoke("game:play", data),
+  uninstallGame: (data: { gameId: number; token: string; installPath: string }) =>
+    ipcRenderer.invoke("game:uninstall", data),
   isUpdateAvailable: () => ipcRenderer.invoke("update:check"),
   installUpdate: () => ipcRenderer.invoke("update:download-and-install"),
   onUpdateProgress: (cb: (percent: number) => void) => ipcRenderer.on("update:progress", (_e, percent) => cb(percent)),
+  onInstallProgress: (cb: (progress: unknown) => void) => {
+    const listener = (_e: Electron.IpcRendererEvent, progress: unknown) => cb(progress);
+    ipcRenderer.on("game:install-progress", listener);
+    return () => ipcRenderer.removeListener("game:install-progress", listener);
+  },
   showNotification: (title: string, body: string) => ipcRenderer.send("notify:show", { title, body }),
   getScreenSources: () => ipcRenderer.invoke("get-screen-sources"),
 

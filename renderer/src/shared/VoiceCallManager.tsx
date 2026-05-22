@@ -21,6 +21,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mic, MicOff, PhoneOff, Phone, Headphones, HeadphoneOff, Monitor, MonitorOff, X, Volume2 } from "lucide-react";
 import { useI18n } from "./i18n";
+import { API_BASE as API } from "../config";
 
 // ICE servers: Google STUN + free OpenRelay TURN (fallback when STUN alone can't pierce NAT)
 const ICE_CONFIG: RTCConfiguration = {
@@ -38,10 +39,6 @@ const ICE_CONFIG: RTCConfiguration = {
   ],
   iceCandidatePoolSize: 10,
 };
-const API  = (window as Window & { __API_BASE__?: string }).__API_BASE__
-           ?? (import.meta as { env?: { VITE_API_BASE?: string } }).env?.VITE_API_BASE
-           ?? "http://localhost:8000";
-
 function getToken(): string | null {
   const rememberMe = localStorage.getItem("remember-me") === "true";
   return (rememberMe ? localStorage : sessionStorage).getItem("auth-token");

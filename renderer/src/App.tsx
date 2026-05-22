@@ -3,6 +3,7 @@ import Auth from "./pages/Auth";
 import Home from "./pages/Home";
 import Shop from "./pages/Shop";
 import Library from "./pages/Library";
+import LibraryGame from "./pages/LibraryGame";
 import Engine from "./pages/Engine";
 import Profile from "./pages/Profile";
 import Overlay from "./pages/Overlay";
@@ -31,6 +32,7 @@ function AnimatedRoutes() {
         <Route path="/shop" element={<Shop />} />
         <Route path="/shop/:gameId" element={<Shop />} />
         <Route path="/library" element={<Library />} />
+        <Route path="/library/:gameId" element={<LibraryGame />} />
         <Route path="/engine" element={<Engine />} />
         <Route path="/profile" element={<Profile />} />
       </Route>
