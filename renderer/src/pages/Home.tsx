@@ -1,36 +1,92 @@
-import { ArrowRight, Globe, Sword, Sparkles } from "lucide-react";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
-import { useLocation, useOutletContext } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useI18n } from "../shared/i18n";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { API_BASE } from "../config";
 
+type ImageKind = "banner" | "cover";
+type SectionType = "hero" | "slider" | "grid";
 
-const featuredFree = [
-  { id: 1, title: "Aether Knights", genre: "RPG" },
-];
+type HomeItem = {
+  id: string;
+  game_id: number | null;
+  title?: string;
+  subtitle?: string;
+  badge?: string;
+  image_kind: ImageKind;
+};
 
-const onSale = [
-  { id: 1, title: "StarForge",   discount: 60, price: "7,99 €" },
-];
+type HomeSection = {
+  id: string;
+  type: SectionType;
+  title: string;
+  subtitle?: string;
+  columns: number;
+  background?: string;
+  items: HomeItem[];
+};
+
+type HomeConfig = {
+  version: number;
+  theme: {
+    background: string;
+    surface: string;
+    accent: string;
+  };
+  sections: HomeSection[];
+};
+
+type HomeLayoutResponse = {
+  config: HomeConfig;
+  updated_at: string | null;
+};
+
+type CatalogGame = {
+  id: number;
+  title: string;
+  genre: string | null;
+  cover_image: string | null;
+  banner_image: string | null;
+  price: number;
+  discount: number;
+  is_free: boolean;
+  is_free_this_week: boolean;
+  is_featured: boolean;
+};
+
+const EMPTY_CONFIG: HomeConfig = {
+  version: 1,
+  theme: {
+    background: "var(--bg-base)",
+    surface: "var(--bg-surface)",
+    accent: "var(--accent)",
+  },
+  sections: [],
+};
+
+function mediaUrl(gameId: number, kind: ImageKind): string {
+  return `${API_BASE}/api/games/${gameId}/${kind}`;
+}
+
+function fmtPrice(game: CatalogGame): string {
+  if (game.is_free || game.is_free_this_week) return "Gratuit";
+  if (game.discount > 0) {
+    const discounted = game.price * (1 - game.discount / 100);
+    return `${discounted.toFixed(2)} €`;
+  }
+  return `${game.price.toFixed(2)} €`;
+}
 
 export default function Home() {
-  const location              = useLocation();
-  const fromAuth              = location.state?.fromAuth === true;
-  const navigate                  = useNavigate();
-  const { t } = useI18n();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const fromAuth = location.state?.fromAuth === true;
   const [showOverlay, setShowOverlay] = useState(fromAuth);
-  const { onlineCount = 0 } = useOutletContext<{ onlineCount: number }>();
+  const [config, setConfig] = useState<HomeConfig>(EMPTY_CONFIG);
+  const [games, setGames] = useState<CatalogGame[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const stats = [
-    { value: "0", label: t.statsGamesInLibrary },
-    { value: "0", label: t.statsActiveDownloads },
-    { value: String(onlineCount), label: t.statsFriendsOnline },
-    { value: t.freeLabel, label: t.statsWeeklyGift },
-  ];
-
-  const radius    = useMotionValue(0);
-  const maskImage = useTransform(radius, r =>
+  const radius = useMotionValue(0);
+  const maskImage = useTransform(radius, (r) =>
     `radial-gradient(circle ${r}px at 50% 50%, transparent ${r}px, black ${r}px)`
   );
 
@@ -44,9 +100,48 @@ export default function Home() {
     return () => controls.stop();
   }, [fromAuth, radius]);
 
-  return (
-    <div style={{ position: "relative" }}>
+  useEffect(() => {
+    const run = async () => {
+      setLoading(true);
+      try {
+        const [layoutRes, gamesRes] = await Promise.all([
+          fetch(`${API_BASE}/api/games/home-layout`),
+          fetch(`${API_BASE}/api/games`),
+        ]);
 
+        if (layoutRes.ok) {
+          const layout = await layoutRes.json() as HomeLayoutResponse;
+          setConfig(layout.config ?? EMPTY_CONFIG);
+        } else {
+          setConfig(EMPTY_CONFIG);
+        }
+
+        if (gamesRes.ok) {
+          setGames(await gamesRes.json());
+        } else {
+          setGames([]);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void run();
+  }, []);
+
+  const gamesById = useMemo(() => {
+    const map = new Map<number, CatalogGame>();
+    games.forEach((g) => map.set(g.id, g));
+    return map;
+  }, [games]);
+
+  const openGame = (gameId: number | null) => {
+    if (!gameId) return;
+    navigate(`/shop/${gameId}`);
+  };
+
+  return (
+    <div style={{ position: "relative", background: config.theme.background }}>
       {showOverlay && (
         <motion.div
           style={{
@@ -61,86 +156,138 @@ export default function Home() {
         />
       )}
 
-        <div className="page">
-
-      {/* ── Stats ────────────────────────────────────────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 28 }}>
-        {stats.map((s) => (
-          <div key={s.label} className="stat">
-            <div className="stat-value">{s.value}</div>
-            <div className="stat-label">{s.label}</div>
+      <div className="page" style={{ gap: 14 }}>
+        {loading ? (
+          <div className="page-loading"><span className="spinner" /> Chargement...</div>
+        ) : config.sections.length === 0 ? (
+          <div className="empty">
+            <div className="empty-icon">🧩</div>
+            <p>Home non configurée. Configure-la depuis le dashboard admin.</p>
           </div>
-        ))}
-      </div>
+        ) : (
+          config.sections.map((section) => {
+            const sectionBg = section.background || config.theme.surface;
 
-      {/* ── Featured & free ──────────────────────────────────────────── */}
-      <div className="section">
-        <div className="page-header" style={{ marginBottom: 14 }}>
-          <h3>{t.featuredAndFree}</h3>
-          <button className="btn btn-ghost" style={{ fontSize: 12, padding: "4px 10px" }} onClick={() => navigate("/library")}>
-            {t.seeAll} <ArrowRight size={12} />
-          </button>
-        </div>
+            if (section.type === "hero") {
+              const item = section.items[0];
+              const game = item?.game_id ? gamesById.get(item.game_id) : undefined;
+              const title = item?.title || game?.title || section.title;
+              const subtitle = item?.subtitle || game?.genre || section.subtitle || "";
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          {/* Main featured card */}
-          <div className="card" style={{ gridRow: "span 3", padding: 0, overflow: "hidden", cursor: "pointer" }}>
-            <div style={{ height: 180, background: "var(--bg-overlay)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Globe size={40} style={{ color: "var(--text-muted)" }} />
-            </div>
-            <div style={{ padding: 12 }}>
-              <div className="card-title">{t.featuredMainTitle}</div>
-              <div className="card-subtitle">{t.featuredMainSubtitle}</div>
-              <div style={{ marginTop: 8 }}>
-                <span className="badge badge-accent">{t.freeThisWeek}</span>
-              </div>
-            </div>
-          </div>
+              return (
+                <div key={section.id} className="card" style={{ padding: 0, overflow: "hidden", background: sectionBg }}>
+                  <div
+                    style={{
+                      minHeight: 260,
+                      position: "relative",
+                      cursor: game ? "pointer" : "default",
+                      background: "linear-gradient(145deg, rgba(18,29,56,.9), rgba(7,11,20,.92))",
+                    }}
+                    onClick={() => openGame(game?.id ?? null)}
+                  >
+                    {game && (
+                      <img
+                        src={mediaUrl(game.id, item?.image_kind ?? "banner")}
+                        alt={title}
+                        style={{ width: "100%", height: "100%", objectFit: "cover", position: "absolute", inset: 0 }}
+                      />
+                    )}
+                    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,.22), rgba(0,0,0,.75))" }} />
+                    <div style={{ position: "relative", zIndex: 1, padding: 22, color: "#fff" }}>
+                      <h2 style={{ marginBottom: 8 }}>{title}</h2>
+                      {subtitle && <p style={{ marginBottom: 10, maxWidth: 620 }}>{subtitle}</p>}
+                      {item?.badge && <span className="badge badge-blue">{item.badge}</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            }
 
-          {/* Side free games */}
-          {featuredFree.map((g) => (
-            <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: 10, cursor: "pointer" }}>
-              <div style={{ width: 48, height: 48, background: "var(--bg-overlay)", borderRadius: "var(--radius-sm)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Sword size={20} style={{ color: "var(--text-muted)" }} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="card-title" style={{ fontSize: 13 }}>{g.title}</div>
-                <div className="card-subtitle">{g.genre} · {t.freeLabel}</div>
-              </div>
-              <span className="badge badge-accent">{t.freeLabel}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+            if (section.type === "slider") {
+              return (
+                <div key={section.id} className="card" style={{ background: sectionBg }}>
+                  <div className="page-header" style={{ marginBottom: 10 }}>
+                    <h3>{section.title}</h3>
+                    {section.subtitle && <p>{section.subtitle}</p>}
+                  </div>
 
-      {/* ── On sale ──────────────────────────────────────────────────── */}
-      <div className="section">
-        <div className="page-header" style={{ marginBottom: 14 }}>
-          <h3>{t.onSaleNow}</h3>
-          <button className="btn btn-ghost" style={{ fontSize: 12, padding: "4px 10px" }}>
-            {t.browseDeals} <ArrowRight size={12} />
-          </button>
-        </div>
+                  <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4 }}>
+                    {section.items.map((item) => {
+                      const game = item.game_id ? gamesById.get(item.game_id) : undefined;
+                      if (!game) return null;
+                      const title = item.title || game.title;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => openGame(game.id)}
+                          style={{
+                            minWidth: 260,
+                            flex: "0 0 260px",
+                            border: "1px solid var(--border)",
+                            borderRadius: 12,
+                            overflow: "hidden",
+                            background: "var(--bg-surface)",
+                            textAlign: "left",
+                            cursor: "pointer",
+                            padding: 0,
+                          }}
+                        >
+                          <div style={{ height: 130, background: "#0f172a" }}>
+                            <img src={mediaUrl(game.id, item.image_kind)} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          </div>
+                          <div style={{ padding: 10 }}>
+                            <div className="card-title">{title}</div>
+                            <div className="card-subtitle">{item.subtitle || game.genre || ""}</div>
+                            <div style={{ marginTop: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              {item.badge ? <span className="badge badge-accent">{item.badge}</span> : <span />}
+                              <span style={{ fontWeight: 600, color: config.theme.accent }}>{fmtPrice(game)}</span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            }
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
-          {onSale.map((g) => (
-            <div key={g.id} className="card" style={{ padding: 0, overflow: "hidden", cursor: "pointer" }}>
-              <div style={{ height: 90, background: "var(--bg-overlay)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Sparkles size={28} style={{ color: "var(--text-muted)" }} />
-              </div>
-              <div style={{ padding: "8px 10px" }}>
-                <div className="card-title" style={{ fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{g.title}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 4 }}>
-                  <span className="badge badge-success" style={{ fontSize: 11 }}>-{g.discount}%</span>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-primary)" }}>{g.price}</span>
+            const columns = Math.max(1, Math.min(6, section.columns || 3));
+            return (
+              <div key={section.id} className="card" style={{ background: sectionBg }}>
+                <div className="page-header" style={{ marginBottom: 10 }}>
+                  <h3>{section.title}</h3>
+                  {section.subtitle && <p>{section.subtitle}</p>}
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${columns}, minmax(160px, 1fr))`, gap: 10 }}>
+                  {section.items.map((item) => {
+                    const game = item.game_id ? gamesById.get(item.game_id) : undefined;
+                    if (!game) return null;
+                    const title = item.title || game.title;
+                    return (
+                      <div
+                        key={item.id}
+                        className="card"
+                        style={{ padding: 0, overflow: "hidden", cursor: "pointer" }}
+                        onClick={() => openGame(game.id)}
+                      >
+                        <div style={{ height: 100, background: "#0f172a" }}>
+                          <img src={mediaUrl(game.id, item.image_kind)} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        </div>
+                        <div style={{ padding: 10 }}>
+                          <div className="card-title" style={{ fontSize: 13 }}>{title}</div>
+                          <div className="card-subtitle">{item.subtitle || game.genre || ""}</div>
+                          {item.badge && <span className="badge badge-success" style={{ marginTop: 6 }}>{item.badge}</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            );
+          })
+        )}
       </div>
-      </div>
-
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { spawn, type ChildProcess } from "child_process";
 import yauzl from "yauzl";
 import { autoUpdater } from "electron-updater";
 
-const DEFAULT_DEV_API_BASE = "http://localhost:8000";
+const DEFAULT_DEV_API_BASE = "http://localhost:8200";
 const DEFAULT_PROD_API_BASE = "http://176.157.240.57:8000";
 
 function resolveApiBase(): string {
@@ -430,7 +430,6 @@ ipcMain.on("overlay:hide-call", () => {
 
 ipcMain.on("overlay:show-notif", (_e, data) => {
   overlayWin?.webContents.send("overlay:show-notif-fwd", data);
-  overlayWin?.setIgnoreMouseEvents(false);
 });
 
 ipcMain.on("overlay:remove-notif", (_e, id) => {
@@ -472,7 +471,6 @@ ipcMain.on("overlay:reply-message-fwd", (_e, data) => {
 // ── Achievement overlay ────────────────────────────────────────────
 ipcMain.on("overlay:show-achievement", (_e, data) => {
   overlayWin?.webContents.send("overlay:show-achievement-fwd", data);
-  overlayWin?.setIgnoreMouseEvents(false);
 });
 
 // ── Friend-request overlay ───────────────────────────────────────

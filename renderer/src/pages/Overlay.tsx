@@ -143,8 +143,7 @@ export default function Overlay() {
   useEffect(() => {
     const api = (window as Window & { api?: OverlayAPI }).api;
     api?.overlaySetInteractive?.(
-      call !== null || notifs.length > 0 || messages.length > 0 ||
-      achievements.length > 0 || friendReqs.length > 0
+      call !== null || messages.length > 0 || friendReqs.length > 0
     );
   }, [call, notifs.length, messages.length, achievements.length, friendReqs.length]);
 

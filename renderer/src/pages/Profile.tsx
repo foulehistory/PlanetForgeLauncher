@@ -81,6 +81,55 @@ function clearTokens() {
   localStorage.removeItem("remember-me");
 }
 
+function getAuthStorage(): Storage {
+  return localStorage.getItem("remember-me") === "true" ? localStorage : sessionStorage;
+}
+
+async function refreshAccessToken(): Promise<string | null> {
+  const storage = getAuthStorage();
+  const refreshToken = storage.getItem("refresh-token");
+  const refreshExp = storage.getItem("refresh-expires-at");
+
+  if (!refreshToken || !refreshExp || new Date(refreshExp).getTime() <= Date.now()) {
+    return null;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    if (!res.ok) return null;
+
+    const data = await res.json() as { access_token: string; access_expires_at: string };
+    storage.setItem("auth-token", data.access_token);
+    storage.setItem("auth-expires-at", data.access_expires_at);
+    return data.access_token;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchWithAuth(input: string, init?: RequestInit): Promise<Response> {
+  const storage = getAuthStorage();
+  const token = storage.getItem("auth-token");
+  if (!token) return fetch(input, init);
+
+  const headers = new Headers(init?.headers ?? {});
+  headers.set("Authorization", `Bearer ${token}`);
+
+  let res = await fetch(input, { ...init, headers });
+  if (res.status !== 401) return res;
+
+  const refreshedToken = await refreshAccessToken();
+  if (!refreshedToken) return res;
+
+  headers.set("Authorization", `Bearer ${refreshedToken}`);
+  return fetch(input, { ...init, headers });
+}
+
 export default function Profile() {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -101,12 +150,10 @@ export default function Profile() {
 
   useEffect(() => {
     const load = async () => {
-      const token = getToken();
-      if (!token) { setError(true); setLoading(false); return; }
       try {
         const [res, achRes] = await Promise.all([
-          fetch(`${API_BASE}/api/users/me`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${API_BASE}/api/achievements/me`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetchWithAuth(`${API_BASE}/api/users/me`),
+          fetchWithAuth(`${API_BASE}/api/achievements/me`),
         ]);
         if (res.status === 401 || res.status === 404) {
           clearTokens();
