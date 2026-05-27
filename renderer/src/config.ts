@@ -5,5 +5,5 @@
  */
 const env = (import.meta as { env: Record<string, string> }).env;
 
-export const API_BASE = env?.VITE_API_URL?.replace(/\/$/, "") ?? "http://localhost:8200";
+export const API_BASE = env?.VITE_API_URL?.replace(/\/$/, "") ?? "http://192.168.1.67:8200";
 export const WS_BASE  = API_BASE.replace(/^http/, "ws");

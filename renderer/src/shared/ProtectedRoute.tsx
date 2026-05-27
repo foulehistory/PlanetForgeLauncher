@@ -20,43 +20,70 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 
   useEffect(() => {
     const check = async () => {
-      const storage      = getStorage();
-      const token        = storage.getItem("auth-token");
-      const refreshToken = storage.getItem("refresh-token");
-      const refreshExp   = storage.getItem("refresh-expires-at");
-      const now          = Date.now();
+      try {
+        const storage      = getStorage();
+        const token        = storage.getItem("auth-token");
+        const refreshToken = storage.getItem("refresh-token");
+        const refreshExp   = storage.getItem("refresh-expires-at");
+        const now          = Date.now();
 
-      if (!token && !refreshToken) {
-        setAuthState("denied");
-        return;
-      }
-
-      // Toujours valider côté serveur via le refresh token.
-      // Ça garantit que l'utilisateur existe encore en DB,
-      // même si le JWT local n'est pas encore expiré.
-      if (refreshToken && refreshExp && new Date(refreshExp).getTime() > now) {
-        const res = await fetch(`${API_BASE}/api/auth/refresh`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refresh_token: refreshToken }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          storage.setItem("auth-token",      data.access_token);
-          storage.setItem("auth-expires-at", data.access_expires_at);
-          setAuthState("ok");
+        if (!token && !refreshToken) {
+          setAuthState("denied");
           return;
         }
-      }
 
-      clearTokens();
-      setAuthState("denied");
+        // Toujours valider côté serveur via le refresh token.
+        // Ça garantit que l'utilisateur existe encore en DB,
+        // même si le JWT local n'est pas encore expiré.
+        if (refreshToken && refreshExp && new Date(refreshExp).getTime() > now) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 8000);
+          try {
+            const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ refresh_token: refreshToken }),
+              signal: controller.signal,
+            });
+            if (res.ok) {
+              const data = await res.json();
+              storage.setItem("auth-token",      data.access_token);
+              storage.setItem("auth-expires-at", data.access_expires_at);
+              setAuthState("ok");
+              return;
+            }
+          } finally {
+            clearTimeout(timeoutId);
+          }
+        }
+
+        clearTokens();
+        setAuthState("denied");
+      } catch {
+        clearTokens();
+        setAuthState("denied");
+      }
     };
 
     check();
   }, []);
 
-  if (authState === "loading") return null;
+  if (authState === "loading") {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          background: "var(--bg-base)",
+          color: "var(--text-muted)",
+          fontSize: 13,
+        }}
+      >
+        Verification de la session...
+      </div>
+    );
+  }
   if (authState === "denied") return <Navigate to="/" replace />;
   return <>{children}</>;
 }

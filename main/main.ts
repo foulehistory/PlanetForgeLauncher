@@ -6,8 +6,8 @@ import { spawn, type ChildProcess } from "child_process";
 import yauzl from "yauzl";
 import { autoUpdater } from "electron-updater";
 
-const DEFAULT_DEV_API_BASE = "http://localhost:8200";
-const DEFAULT_PROD_API_BASE = "http://176.157.240.57:8000";
+const DEFAULT_DEV_API_BASE = "http://192.168.1.67:8200";
+const DEFAULT_PROD_API_BASE = "http://192.168.1.67:8200";
 
 function resolveApiBase(): string {
   const fallback = app.isPackaged ? DEFAULT_PROD_API_BASE : DEFAULT_DEV_API_BASE;
