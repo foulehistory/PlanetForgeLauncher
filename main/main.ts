@@ -430,6 +430,8 @@ ipcMain.on("overlay:hide-call", () => {
 
 ipcMain.on("overlay:show-notif", (_e, data) => {
   overlayWin?.webContents.send("overlay:show-notif-fwd", data);
+  // Notification toasts are passive: keep click-through enabled.
+  overlayWin?.setIgnoreMouseEvents(true, { forward: true });
 });
 
 ipcMain.on("overlay:remove-notif", (_e, id) => {
@@ -471,6 +473,8 @@ ipcMain.on("overlay:reply-message-fwd", (_e, data) => {
 // ── Achievement overlay ────────────────────────────────────────────
 ipcMain.on("overlay:show-achievement", (_e, data) => {
   overlayWin?.webContents.send("overlay:show-achievement-fwd", data);
+  // Achievement popups are passive: keep click-through enabled.
+  overlayWin?.setIgnoreMouseEvents(true, { forward: true });
 });
 
 // ── Friend-request overlay ───────────────────────────────────────

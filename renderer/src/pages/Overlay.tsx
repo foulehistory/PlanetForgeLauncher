@@ -153,9 +153,6 @@ export default function Overlay() {
     api?.overlaySetFocusable?.(messages.length > 0 || friendReqs.length > 0);
   }, [messages.length, friendReqs.length]);
 
-  const dismissAchievement = (id: string) =>
-    setAchievements((prev) => prev.filter((a) => a.id !== id));
-
   const acceptFriendReq = (id: string, friendshipId: number) => {
     (window as Window & { api?: OverlayAPI }).api?.overlayAcceptRequest?.({ friendshipId });
     setFriendReqs((prev) => prev.filter((r) => r.id !== id));
@@ -175,9 +172,6 @@ export default function Overlay() {
     (window as Window & { api?: OverlayAPI }).api?.overlayDeclineCall?.();
     setCall(null);
   };
-
-  const dismissNotif = (id: string) =>
-    setNotifs((prev) => prev.filter((n) => n.id !== id));
 
   const dismissMessage = (id: string) => {
     setMessages((prev) => prev.filter((m) => m.id !== id));
@@ -428,7 +422,7 @@ export default function Overlay() {
                   display: "flex",
                   alignItems: "flex-start",
                   gap: 10,
-                  pointerEvents: "auto",
+                  pointerEvents: "none",
                   boxShadow: "0 4px 24px rgba(0,0,0,0.6)",
                 }}
               >
@@ -443,16 +437,7 @@ export default function Overlay() {
                     </div>
                   )}
                 </div>
-                <button
-                  onClick={() => dismissNotif(n.id)}
-                  style={{
-                    background: "none", border: "none", cursor: "pointer",
-                    padding: 2, color: "var(--text-muted)", flexShrink: 0,
-                    display: "flex", alignItems: "center",
-                  }}
-                >
-                  <X size={12} />
-                </button>
+                <X size={12} color="var(--text-muted)" style={{ flexShrink: 0 }} />
               </motion.div>
             );
           })}
@@ -572,7 +557,7 @@ export default function Overlay() {
                 minWidth: 280,
                 maxWidth: 380,
                 boxShadow: "0 0 40px rgba(255,215,0,0.25), 0 8px 40px rgba(0,0,0,0.8)",
-                pointerEvents: "auto",
+                pointerEvents: "none",
                 display: "flex",
                 alignItems: "center",
                 gap: 16,
@@ -618,16 +603,7 @@ export default function Overlay() {
                 )}
               </div>
 
-              <button
-                onClick={() => dismissAchievement(a.id)}
-                style={{
-                  background: "none", border: "none", cursor: "pointer",
-                  padding: 4, color: "var(--text-muted)", flexShrink: 0,
-                  display: "flex", alignItems: "center",
-                }}
-              >
-                <X size={13} />
-              </button>
+              <X size={13} color="var(--text-muted)" style={{ flexShrink: 0 }} />
             </motion.div>
           ))}
         </AnimatePresence>
